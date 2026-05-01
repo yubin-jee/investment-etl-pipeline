@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ComplianceRules version="2.1" lastUpdated="2023-06-15">
+    <Rule id="RULE-001" severity="CRITICAL">
+        <Name>Single Security Concentration Limit</Name>
+        <Description>No single equity position shall exceed 10% of total portfolio market value</Description>
+        <Threshold>0.10</Threshold>
+        <AssetClass>EQUITY</AssetClass>
+        <Action>BLOCK_TRADE</Action>
+    </Rule>
+    <Rule id="RULE-002" severity="HIGH">
+        <Name>Sector Concentration Limit</Name>
+        <Description>No single sector shall exceed 30% of total portfolio market value</Description>
+        <Threshold>0.30</Threshold>
+        <AssetClass>EQUITY</AssetClass>
+        <Action>ALERT</Action>
+    </Rule>
+    <Rule id="RULE-003" severity="MEDIUM">
+        <Name>Fixed Income Minimum Allocation</Name>
+        <Description>Fixed income allocation shall not fall below 15% for retirement and pension accounts</Description>
+        <Threshold>0.15</Threshold>
+        <AssetClass>FIXED_INCOME</AssetClass>
+        <AccountTypes>401K,PENSION</AccountTypes>
+        <Action>ALERT</Action>
+    </Rule>
+    <Rule id="RULE-004" severity="HIGH">
+        <Name>Trade Settlement Monitoring</Name>
+        <Description>All trades must settle within T+2 business days</Description>
+        <SettlementDays>2</SettlementDays>
+        <Action>ESCALATE</Action>
+    </Rule>
+    <Rule id="RULE-005" severity="CRITICAL">
+        <Name>Position Reconciliation Tolerance</Name>
+        <Description>Internal positions must match custodian positions within 0.01% tolerance</Description>
+        <Threshold>0.0001</Threshold>
+        <Action>BLOCK_TRADE</Action>
+    </Rule>
+    <Rule id="RULE-006" severity="LOW">
+        <Name>Cash Buffer Requirement</Name>
+        <Description>Each account must maintain minimum 2% cash buffer</Description>
+        <Threshold>0.02</Threshold>
+        <Action>ALERT</Action>
+    </Rule>
+</ComplianceRules>

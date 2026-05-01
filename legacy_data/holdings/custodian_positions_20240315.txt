@@ -1,0 +1,30 @@
+================================================================
+  STATE STREET CUSTODIAN - POSITION REPORT
+  AS OF: 03/15/2024
+  CLIENT: MERIDIAN CAPITAL PARTNERS LLC
+  GENERATED: 03/16/2024 02:15:33 AM EST
+================================================================
+
+ACCOUNT    SECURITY             CUSIP         QTY        MKT PRICE    MKT VALUE
+---------- -------------------- ------------- ---------- ------------ ---------------
+ACC-1001   APPLE INC            037833100          1,500       171.48      257,220.00
+ACC-1001   ALPHABET INC-CL A    02079K305            400       138.92       55,568.00
+ACC-1001   TESLA INC            88160R101            250       163.57       40,892.50
+ACC-1001   PROCTER & GAMBLE     742718109            800       160.34      128,272.00
+ACC-1001   VANGUARD BOND ETF    ---                2,000        75.60      151,200.00
+ACC-1002   MICROSOFT CORP       594918104            300       412.27      123,681.00
+ACC-1002   NVIDIA CORP          67066G104            150       878.37      131,755.50
+ACC-1002   HOME DEPOT           437076102            120       385.79       46,294.80
+ACC-1003   AMAZON.COM INC       023135106            700       178.25      124,775.00
+ACC-1003   VISA INC-CL A       92826C839            350       279.85       97,947.50
+ACC-1003   WALT DISNEY CO       254687106            450       111.47       50,161.50
+ACC-1003   ISHARES AGG BOND     ---                3,000       100.25      300,750.00
+ACC-1004   META PLATFORMS       30303M102            600       484.03      290,418.00
+ACC-1004   UNITEDHEALTH GRP     91324P102             75       494.56       37,092.00
+ACC-1005   JPMORGAN CHASE       46625H100            600       193.42      116,052.00
+ACC-1005   MASTERCARD INC       57636Q104             90       471.28       42,415.20
+ACC-1005   ISHARES 20YR TREAS   ---                1,500        96.20      144,300.00
+================================================================
+  TOTAL POSITIONS: 17
+  TOTAL MARKET VALUE: $2,148,804.50
+================================================================

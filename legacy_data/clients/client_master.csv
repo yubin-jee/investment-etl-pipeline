@@ -1,0 +1,7 @@
+ACCT_NUM,CLIENT_NAME,CLIENT_TYPE,TAX_ID,INCEPTION_DATE,AUM_TIER,FEE_SCHEDULE,BENCHMARK,PM_NAME,STATUS,ADDRESS,CITY,STATE,ZIP,PHONE,EMAIL
+ACC-1001,Westbrook Family Trust,TRUST,XX-XXX4521,01/15/2018,TIER_1,1.00%,SP500,James Richardson,ACTIVE,"450 Park Avenue, Suite 2200",New York,NY,10022,(212) 555-0147,westbrook.trust@email.com
+ACC-1002,Pinnacle Growth Fund LP,HEDGE_FUND,XX-XXX8834,06/22/2019,TIER_2,1.50%,RUSSELL2000,Sarah Chen,ACTIVE,"100 Financial Center",Boston,MA,02111,(617) 555-0293,ops@pinnaclegrowth.com
+ACC-1003,Meridian Retirement Plan,401K,XX-XXX2917,03/01/2020,TIER_1,0.75%,6040BLEND,James Richardson,ACTIVE,"1 Corporate Drive",Hartford,CT,06103,(860) 555-0184,retirement@meridianhr.com
+ACC-1004,Thornton Endowment,ENDOWMENT,XX-XXX6643,11/10/2017,TIER_3,0.85%,MSCI_WORLD,David Park,ACTIVE,"200 University Blvd",Princeton,NJ,08544,(609) 555-0312,endowment@thornton.edu
+ACC-1005,Chen Family Office,FAMILY_OFFICE,XX-XXX1298,08/05/2021,TIER_2,1.25%,CUSTOM_BLEND,Sarah Chen,ACTIVE,"888 Prosperity Lane",San Francisco,CA,94105,(415) 555-0456,office@chenfamily.com
+ACC-1006,Harbor View Pension,PENSION,XX-XXX5571,02/28/2023,TIER_1,0.65%,LBAG_BLEND,David Park,ACTIVE,"75 State Street",Albany,NY,12207,(518) 555-0178,pension@harborview.org
