@@ -23,7 +23,10 @@ def load_trades(file_path: str) -> pd.DataFrame:
 
     conn = duckdb.connect()
 
-    df = conn.sql(f"""
+    raw = conn.read_csv(file_path, all_varchar=True)
+    conn.register("csv_raw", raw)
+
+    df = conn.sql("""
         SELECT
             TRADE_ID AS trade_id,
             ACCT_NUM AS account,
@@ -36,7 +39,7 @@ def load_trades(file_path: str) -> pd.DataFrame:
             BROKER AS broker,
             TRY_CAST(COMMISSION AS DOUBLE) AS commission,
             STATUS AS status
-        FROM read_csv_auto('{file_path}', all_varchar=true)
+        FROM csv_raw
         WHERE TRY_CAST(QTY AS INTEGER) IS NOT NULL
           AND TRY_CAST(PRICE AS DOUBLE) IS NOT NULL
     """).df()
@@ -53,13 +56,16 @@ def validate_trades(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     print("Validating trades...")
 
     conn = duckdb.connect()
+
+    df = df.copy()
+    df["_input_order"] = range(len(df))
     conn.register("trades_raw", df)
 
     initial_count = conn.sql("SELECT COUNT(*) FROM trades_raw").fetchone()[0]
 
     deduped = conn.sql("""
         SELECT * FROM (
-            SELECT *, ROW_NUMBER() OVER (PARTITION BY trade_id ORDER BY trade_id) AS rn
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY trade_id ORDER BY _input_order) AS rn
             FROM trades_raw
         ) WHERE rn = 1
     """)
