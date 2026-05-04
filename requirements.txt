@@ -13,3 +13,8 @@
 # lxml>=4.9.0
 # schedule>=1.1.0
 # boto3>=1.26.0  # if we move to AWS
+
+# Modernized trade processing dependencies
+pandas>=2.0.0
+polars>=0.20.0
+duckdb>=0.10.0
