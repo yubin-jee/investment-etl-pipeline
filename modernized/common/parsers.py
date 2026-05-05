@@ -38,15 +38,15 @@ TRADE_CSV_DTYPES = {
 }
 
 CONFIRM_COLSPECS = [
-    (0, 16),   # trade_id
-    (16, 26),  # account
-    (26, 36),  # ticker
-    (36, 40),  # side
-    (40, 52),  # quantity (zero-padded)
-    (52, 64),  # price (implied 2 decimals)
-    (64, 67),  # currency
-    (67, 75),  # date (MMDDYYYY)
-    (75, 83),  # status
+    (0, 14),   # trade_id
+    (14, 24),  # account
+    (24, 34),  # ticker
+    (34, 38),  # side
+    (38, 46),  # quantity (zero-padded)
+    (46, 56),  # price (implied 2 decimals)
+    (56, 59),  # currency
+    (59, 67),  # date (MMDDYYYY)
+    (67, 76),  # status
 ]
 
 CONFIRM_COLUMN_NAMES = [

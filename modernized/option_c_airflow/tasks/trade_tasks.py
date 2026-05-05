@@ -20,7 +20,7 @@ from modernized.common.validation import validate_trades
 logger = logging.getLogger(__name__)
 
 # Repository root resolved relative to this file
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _TRADE_DIR = _REPO_ROOT / "legacy_data" / "trades"
 _CONFIRM_FILE = _REPO_ROOT / "legacy_data" / "trades" / "counterparty_confirms.dat"
 _OUTPUT_DIR = _REPO_ROOT / "reports"

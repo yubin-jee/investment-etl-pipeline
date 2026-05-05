@@ -27,7 +27,7 @@ def raw_trades(
     trade_files: TradeFileResource,
 ) -> pd.DataFrame:
     """Load raw trades from the daily CSV for the partitioned run date."""
-    run_date = context.partition_key
+    run_date = context.partition_key.replace("-", "")
     file_path = trade_files.get_trade_file_path(run_date)
     context.log.info("Loading trades from %s", file_path)
 

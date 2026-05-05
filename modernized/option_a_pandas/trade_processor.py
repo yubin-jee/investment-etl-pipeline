@@ -9,82 +9,17 @@ and O(n^2) reconciliation.
 import argparse
 import logging
 from datetime import datetime
-from io import StringIO
 from pathlib import Path
 
 import pandas as pd
 
 from modernized.common.config import load_config
 from modernized.common.models import ProcessingResult
-from modernized.common.parsers import load_trades_csv
+from modernized.common.parsers import load_counterparty_file, load_trades_csv
 from modernized.common.settlement import calculate_t_plus_2
 from modernized.common.validation import validate_trades
 
 logger = logging.getLogger(__name__)
-
-# Corrected fixed-width field positions for counterparty confirmation files.
-# The common parser colspecs are offset by +2 on the trade_id field, which
-# cascades misalignment across all subsequent fields.  These positions were
-# verified against the actual data layout in counterparty_confirms.dat.
-_CONFIRM_COLSPECS = [
-    (0, 14),   # trade_id  (e.g. "T-20240315-001")
-    (14, 24),  # account   (e.g. "ACC-1001  ")
-    (24, 34),  # ticker    (e.g. "AAPL      ")
-    (34, 38),  # side      (e.g. "BUY ")
-    (38, 46),  # quantity  (zero-padded, 8 digits)
-    (46, 56),  # price     (implied 2 decimals, 10 digits)
-    (56, 59),  # currency  (e.g. "USD")
-    (59, 67),  # date      (MMDDYYYY)
-    (67, 76),  # status    (e.g. "SETTLED  ")
-]
-
-_CONFIRM_COLUMNS = [
-    "trade_id", "account", "ticker", "side",
-    "quantity", "price", "currency", "date", "status",
-]
-
-
-def _load_counterparty_file(filepath: Path) -> pd.DataFrame:
-    """Load a fixed-width counterparty confirmation file.
-
-    Uses corrected field positions that match the actual data layout.
-
-    Args:
-        filepath: Path to the .dat confirmation file.
-
-    Returns:
-        DataFrame with parsed confirmation records.
-    """
-    logger.info("Loading counterparty confirms from %s", filepath)
-
-    trade_lines: list[str] = []
-    with open(filepath, "r") as f:
-        for line in f:
-            if line.startswith("T-"):
-                trade_lines.append(line)
-
-    if not trade_lines:
-        logger.warning("No trade records found in %s", filepath)
-        return pd.DataFrame(columns=_CONFIRM_COLUMNS)
-
-    trade_text = "".join(trade_lines)
-
-    df = pd.read_fwf(
-        StringIO(trade_text),
-        colspecs=_CONFIRM_COLSPECS,
-        names=_CONFIRM_COLUMNS,
-        dtype=str,
-    )
-
-    for col in ("trade_id", "account", "ticker", "side", "status", "currency"):
-        df[col] = df[col].str.strip()
-
-    df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").astype("Int64")
-    df["price"] = pd.to_numeric(df["price"], errors="coerce") / 100.0
-    df["date"] = pd.to_datetime(df["date"], format="%m%d%Y", errors="coerce")
-
-    logger.info("Parsed %d counterparty confirms", len(df))
-    return df
 
 
 def _resolve_trade_file(run_date: str, config: dict) -> Path:
@@ -355,7 +290,7 @@ def process_trades(run_date: str, config_path: Path | None = None) -> Processing
     # 6. Reconcile with counterparty confirms
     confirm_path = _resolve_counterparty_file(trade_file)
     if confirm_path is not None:
-        confirms_df = _load_counterparty_file(confirm_path)
+        confirms_df = load_counterparty_file(confirm_path)
     else:
         confirms_df = pd.DataFrame()
 
