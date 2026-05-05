@@ -166,6 +166,36 @@ The goal is to modernize this legacy system into a production-grade ETL pipeline
 - Add monitoring, alerting, and observability
 - Documentation and runbooks
 
+## Modernization Prototypes
+
+Three parallel modernization approaches have been implemented for the trade processing ingestion layer (`legacy_scripts/process_trades.py`). Each approach uses a shared common layer and produces identical output, enabling side-by-side evaluation:
+
+| Option | Approach | Directory |
+|--------|----------|-----------|
+| **A** | Pandas + Pydantic standalone script | `modernized/option_a_pandas/` |
+| **B** | Dagster asset-based pipeline | `modernized/option_b_dagster/` |
+| **C** | Apache Airflow DAG pipeline | `modernized/option_c_airflow/` |
+
+All three options share a common layer in `modernized/common/` that provides:
+- **Pydantic v2 models** for validated data structures
+- **Pandas-based parsers** for CSV and fixed-width file ingestion
+- **Correct T+2 settlement** calculation using business days
+- **Config loader** that reads from `config/batch_config.ini`
+
+See [`modernized/comparison.md`](modernized/comparison.md) for a detailed side-by-side comparison, including a recommendation.
+
+### Quick Start (Option A)
+
+```bash
+pip install -r modernized/requirements_option_a.txt
+python -m modernized.option_a_pandas.trade_processor \
+    --date 20240315 \
+    --config config/batch_config.ini \
+    --trade-file legacy_data/trades/daily_trades_20240315.csv \
+    --confirm-file legacy_data/trades/counterparty_confirms.dat \
+    --output-dir reports/
+```
+
 ## Data Quality Issues in Sample Data
 
 The sample data intentionally includes several issues that the migration should address:
