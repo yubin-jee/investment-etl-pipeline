@@ -35,3 +35,10 @@ logs/
 # Data (keep sample data, ignore production drops)
 *.bak
 *.tmp
+
+# Pipeline outputs (generated)
+option_a/output/
+option_b/output/
+option_c/output/
+option_c/input/
+option_c/trades.db
