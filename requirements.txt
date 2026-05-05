@@ -13,3 +13,14 @@
 # lxml>=4.9.0
 # schedule>=1.1.0
 # boto3>=1.26.0  # if we move to AWS
+
+# ──────────────────────────────────────────────────────────────
+# MODERNIZATION: See the option-specific requirements files for
+# each trade processing modernization prototype:
+#
+#   modernized/requirements_option_a.txt  — Pandas + Pydantic
+#   modernized/requirements_option_b.txt  — Dagster
+#   modernized/requirements_option_c.txt  — Airflow
+#
+# Refer to modernized/comparison.md for a full analysis.
+# ──────────────────────────────────────────────────────────────
