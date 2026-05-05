@@ -28,20 +28,20 @@ TRADE_CSV_COLUMNS = [
     "status",
 ]
 
-# Fixed-width column specifications for counterparty confirmation records
-# Field positions from the legacy spec:
-#   Trade ID 0-16, Account 16-26, Ticker 26-36, Side 36-40,
-#   Qty 40-52, Price 52-64, Currency 64-67, Date 67-75, Status 75-83
+# Fixed-width column specifications for counterparty confirmation records.
+# The legacy spec listed wider positions (0-16, 16-26, …, 75-83) but the
+# actual data files in the repository use 76-character lines.  The correct
+# field boundaries (verified against the sample .dat files) are below.
 CONFIRM_COLSPECS = [
-    (0, 16),   # trade_id
-    (16, 26),  # account
-    (26, 36),  # ticker
-    (36, 40),  # side
-    (40, 52),  # quantity (zero-padded integer)
-    (52, 64),  # price (implied 2 decimal places)
-    (64, 67),  # currency
-    (67, 75),  # date (MMDDYYYY)
-    (75, 83),  # status
+    (0, 14),   # trade_id
+    (14, 22),  # account
+    (22, 34),  # ticker
+    (34, 38),  # side
+    (38, 46),  # quantity (zero-padded integer)
+    (46, 56),  # price (implied 2 decimal places)
+    (56, 59),  # currency
+    (59, 67),  # date (MMDDYYYY)
+    (67, 76),  # status
 ]
 
 CONFIRM_COLUMN_NAMES = [
