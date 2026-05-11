@@ -1,15 +1,16 @@
-# Meridian Capital - Legacy Script Dependencies
-# NOTE: These scripts were written for Python 3.6 on Windows Server 2016
-# They probably work on newer Python but nobody has tested
+# Meridian Capital Partners — Dependencies
+# Legacy scripts use stdlib only; modernized modules require the packages below.
 
-# No external dependencies! Everything uses stdlib.
-# Mike: "I don't trust pip, it broke our server once"
-# 
-# If we ever modernize, we should probably use:
-# pandas>=1.5.0
-# sqlalchemy>=2.0.0
-# openpyxl>=3.0.0
-# python-dotenv>=0.19.0
-# lxml>=4.9.0
-# schedule>=1.1.0
-# boto3>=1.26.0  # if we move to AWS
+# Core data processing
+pandas>=1.5.0
+sqlalchemy>=2.0.0
+pydantic>=2.0.0
+
+# Configuration
+python-dotenv>=0.19.0
+
+# Event-driven processing (Option C)
+watchdog>=3.0.0
+
+# Testing
+pytest>=7.0.0
