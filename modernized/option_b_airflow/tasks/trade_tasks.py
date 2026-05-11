@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -113,7 +113,7 @@ def write_to_db_task(
 
     init_db(conn)
     session = get_session(conn)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     try:
         for d in trade_dicts:

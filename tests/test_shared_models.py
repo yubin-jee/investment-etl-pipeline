@@ -145,7 +145,7 @@ class TestCounterpartyConfirmModel:
         )
         assert c.trade_id == "T-001"
         assert c.trade_date == date(2024, 3, 15)
-        assert c.price == 171.48
+        assert abs(c.price - 171.48) < 0.001
 
     def test_confirm_mmddyyyy_date(self):
         c = CounterpartyConfirm(

@@ -8,7 +8,7 @@ primary key on TradeID.
 from __future__ import annotations
 
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from sqlalchemy import Date, DateTime, Integer, Numeric, String, create_engine
@@ -41,7 +41,7 @@ class TradeRecord(Base):
     recon_status: Mapped[Optional[str]] = mapped_column("ReconStatus", String(30), nullable=True)
     processed_at: Mapped[Optional[datetime]] = mapped_column("ProcessedAt", DateTime, nullable=True)
     created_date: Mapped[Optional[datetime]] = mapped_column(
-        "CreatedDate", DateTime, nullable=True, default=datetime.utcnow
+        "CreatedDate", DateTime, nullable=True, default=lambda: datetime.now(timezone.utc)
     )
 
 

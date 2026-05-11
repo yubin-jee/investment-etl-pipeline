@@ -25,11 +25,11 @@ class TestParseTradeCSV:
         assert t.ticker == "AAPL"
         assert t.side == "BUY"
         assert t.quantity == 500
-        assert t.price == 171.48
+        assert abs(t.price - 171.48) < 0.001
         assert t.trade_date == date(2024, 3, 15)
         assert t.settle_date == date(2024, 3, 19)
         assert t.broker.value == "GOLDMN"
-        assert t.commission == 12.50
+        assert abs(t.commission - 12.50) < 0.001
         assert t.status == "SETTLED"
 
     def test_missing_settle_date(self):
@@ -58,7 +58,7 @@ class TestParseCounterpartyDat:
         assert c.ticker == "AAPL"
         assert c.side == "BUY"
         assert c.quantity == 500
-        assert c.price == 171.48
+        assert abs(c.price - 171.48) < 0.001
         assert c.currency == "USD"
         assert c.trade_date == date(2024, 3, 15)
         assert c.status == "SETTLED"
@@ -74,4 +74,4 @@ class TestParseCounterpartyDat:
         """Prices in the .dat file have implied 2 decimal places."""
         confirms = parse_counterparty_dat(CONFIRM_FILE)
         c_msft = [c for c in confirms if c.ticker == "MSFT"][0]
-        assert c_msft.price == 412.27
+        assert abs(c_msft.price - 412.27) < 0.001

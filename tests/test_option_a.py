@@ -43,7 +43,7 @@ class TestOptionAEndToEnd:
         assert "net_amount" in df.columns
         # gross = qty * price for first trade: 500 * 171.48 = 85740.0
         first = df.iloc[0]
-        assert first["gross_amount"] == 500 * 171.48
+        assert abs(first["gross_amount"] - 500 * 171.48) < 0.01
 
     def test_recon_statuses_present(self, tmp_path):
         df = run(

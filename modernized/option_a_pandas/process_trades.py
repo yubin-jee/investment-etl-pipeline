@@ -18,7 +18,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -99,7 +99,7 @@ def write_to_db(df: pd.DataFrame, connection_string: Optional[str] = None) -> No
     """Persist trades to the database via SQLAlchemy."""
     init_db(connection_string)
     session = get_session(connection_string)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     try:
         for _, row in df.iterrows():
