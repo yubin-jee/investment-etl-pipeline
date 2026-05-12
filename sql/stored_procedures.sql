@@ -11,9 +11,11 @@
 
 -- Get all trades for a date range
 -- Used by: Trade blotter screen, compliance team
+-- Fixed: now uses proper DATE parameters and comparison (JIRA-4521).
+-- Requires migration 001_modernize_trades_schema.sql (TradeDate is DATE).
 CREATE PROCEDURE sp_GetTrades
-    @StartDate VARCHAR(10),
-    @EndDate VARCHAR(10),
+    @StartDate DATE,
+    @EndDate DATE,
     @AccountNumber VARCHAR(20) = NULL
 AS
 BEGIN
@@ -40,10 +42,6 @@ BEGIN
       AND TradeDate <= @EndDate
       AND (@AccountNumber IS NULL OR AccountNumber = @AccountNumber)
     ORDER BY TradeDate DESC, TradeID
-    -- NOTE: this does string comparison on dates which works
-    -- because MM/DD/YYYY format... wait, no it doesn't.
-    -- It works for same-year queries. Cross-year is broken.
-    -- TODO: fix date handling (filed as JIRA-4521, 2021)
 END
 GO
 
