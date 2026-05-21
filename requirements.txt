@@ -1,6 +1,13 @@
 # Meridian Capital - Legacy Script Dependencies
 # NOTE: These scripts were written for Python 3.6 on Windows Server 2016
 # They probably work on newer Python but nobody has tested
+#
+# ── Modernization Options ──
+# See the option-specific requirements files for each modernization approach:
+#   modernized/requirements_option_a.txt  — Pandas + Pydantic (standalone)
+#   modernized/requirements_option_b.txt  — Dagster (asset-based pipeline)
+#   modernized/requirements_option_c.txt  — Airflow (DAG-based orchestration)
+# Full comparison: modernized/comparison.md
 
 # No external dependencies! Everything uses stdlib.
 # Mike: "I don't trust pip, it broke our server once"
