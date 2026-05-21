@@ -166,6 +166,25 @@ The goal is to modernize this legacy system into a production-grade ETL pipeline
 - Add monitoring, alerting, and observability
 - Documentation and runbooks
 
+## Modernization Prototypes
+
+Three parallel modernization approaches have been implemented for the trade processing
+ingestion layer. Each option uses a **shared common layer** (`modernized/common/`) for
+parsing, validation, settlement calculation, and configuration — they differ only in
+orchestration and execution model.
+
+| Option | Directory | Approach | Best For |
+|--------|-----------|----------|----------|
+| **A** | `modernized/option_a_pandas/` | Pandas + Pydantic standalone script | Quick wins, minimal infrastructure |
+| **B** | `modernized/option_b_dagster/` | Dagster asset-based pipeline | Data-centric pipelines with lineage |
+| **C** | `modernized/option_c_airflow/` | Airflow DAG-based orchestration | Complex multi-system workflows |
+
+All three produce **identical output** given the same input and can be validated against
+the legacy `process_trades.py` script.
+
+See [`modernized/comparison.md`](modernized/comparison.md) for the full side-by-side
+analysis, architecture diagrams, and recommendation.
+
 ## Data Quality Issues in Sample Data
 
 The sample data intentionally includes several issues that the migration should address:
