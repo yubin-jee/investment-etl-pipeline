@@ -184,27 +184,27 @@ def process_counterparty_file(filepath):
     for line in f:
         if line.startswith("HDR"):
             # header record - extract broker name
-            current_broker = line[14:36].strip()
+            current_broker = line[11:31].strip()
             print("  Broker: " + current_broker)
         elif line.startswith("TRL"):
             # trailer record - skip
-            count = int(line[3:12])
+            count = int(line[3:11])
             print("  Trailer count: " + str(count))
         elif line.startswith("T-"):
             # trade record
             confirm = {}
-            confirm["trade_id"] = line[0:16].strip()
-            confirm["account"] = line[16:26].strip()
-            confirm["ticker"] = line[26:36].strip()
-            confirm["side"] = line[36:40].strip()
-            confirm["quantity"] = int(line[40:52])
+            confirm["trade_id"] = line[0:14].strip()
+            confirm["account"] = line[14:24].strip()
+            confirm["ticker"] = line[24:34].strip()
+            confirm["side"] = line[34:38].strip()
+            confirm["quantity"] = int(line[38:46])
             # price has implied 2 decimal places
-            raw_price = int(line[52:64])
+            raw_price = int(line[46:56])
             confirm["price"] = raw_price / 100.0
-            confirm["currency"] = line[64:67].strip()
-            date_str = line[67:75]
+            confirm["currency"] = line[56:59].strip()
+            date_str = line[59:67]
             confirm["trade_date"] = date_str[0:2] + "/" + date_str[2:4] + "/" + date_str[4:8]
-            confirm["status"] = line[75:83].strip()
+            confirm["status"] = line[67:75].strip()
             confirm["broker"] = current_broker
             confirms.append(confirm)
 
