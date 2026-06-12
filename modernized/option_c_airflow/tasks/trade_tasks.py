@@ -85,7 +85,7 @@ _DATE_FMT = "%m/%d/%Y"
 # Matches a Windows path (drive letter or any backslash). The legacy config
 # stores Windows network-drive paths that are meaningless on this POSIX host, so
 # we ignore them rather than letting them create bogus literal directories.
-_WINDOWS_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]|\\")
+_WINDOWS_PATH_RE = re.compile(r"(?:^[A-Za-z]:[\\/])|\\")
 
 
 def _is_local_usable(path_str: str) -> bool:
