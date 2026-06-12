@@ -125,6 +125,24 @@ python legacy_scripts/generate_client_reports.py 20240315
 
 Output reports are written to the `reports/` directory.
 
+## Modernization Prototypes
+
+The `modernized/` directory contains three parallel, runnable modernizations of
+the legacy `legacy_scripts/process_trades.py` trade-ingestion pipeline. All three
+share a common layer (`modernized/common/`: Pydantic models, pandas parsers,
+validation, T+2 settlement, config loader) and differ only in orchestration:
+
+| Option | Approach | Best for | Requirements |
+|--------|----------|----------|--------------|
+| **A** | `option_a_pandas/` — standalone Pandas + Pydantic script | Quick wins, small team, zero infra | `modernized/requirements_option_a.txt` |
+| **B** | `option_b_dagster/` — Dagster asset graph | Data-centric pipelines (lineage, backfills, UI) | `modernized/requirements_option_b.txt` |
+| **C** | `option_c_airflow/` — Airflow DAG | Complex multi-system orchestration | `modernized/requirements_option_c.txt` |
+
+Given the same input, all three produce identical output. See
+[`modernized/comparison.md`](modernized/comparison.md) for the full side-by-side
+analysis and recommendation (**Option B / Dagster** for Meridian's use case, with
+Option A as an incremental stepping stone).
+
 ## Migration Objectives
 
 The goal is to modernize this legacy system into a production-grade ETL pipeline. Key migration requirements:
