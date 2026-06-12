@@ -1,0 +1,7 @@
+# Generated pipeline outputs (report CSVs + error logs)
+output/
+
+# Dagster local instance / run storage
+.dagster/
+dagster_home/
+tmp*/
