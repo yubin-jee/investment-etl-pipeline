@@ -254,14 +254,9 @@ def process_trades(run_date: str, config_path: Path) -> ProcessingResult:
         reasons = errors["error_reason"].astype("string")
 
     duplicates_removed = int((reasons == "DUPLICATE").sum())
-    # Pydantic model validation failures only; broker-whitelist rejections are
-    # written to the error log but reported separately (see README).
-    validation_errors = int(reasons.str.startswith("VALIDATION").sum())
-    invalid_brokers = int(reasons.str.startswith("INVALID_BROKER").sum())
-    if invalid_brokers:
-        logger.warning(
-            "%d trade(s) rejected for non-whitelisted broker", invalid_brokers
-        )
+    # Every non-duplicate error row counts as a validation error (matching the
+    # legacy script, which treats a non-whitelisted broker as an error too).
+    validation_errors = len(errors) - duplicates_removed
 
     enriched = _enrich_trades(valid)
 

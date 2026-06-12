@@ -32,10 +32,12 @@ modules so that all three modernization options produce **identical** output:
 ### Counting note
 
 On the test data `validate_trades` returns three error rows: one `DUPLICATE`,
-one `INVALID_BROKER:WRONGBK`, and one `VALIDATION` (negative quantity). To match
-the required summary (`validation_errors=1`), `validation_errors` counts only
-Pydantic model-validation failures; broker-whitelist rejections are still
-written to the error log and logged as a warning, but reported separately.
+one `INVALID_BROKER:WRONGBK`, and one `VALIDATION` (negative quantity).
+`duplicates_removed` counts the `DUPLICATE` rows and `validation_errors` is the
+natural count of the remaining error rows
+(`len(error_df) - duplicates_removed`), so a non-whitelisted broker counts as a
+validation error — matching the legacy script. All error rows are also written
+to the error log.
 
 ## Input/output file resolution
 
@@ -70,7 +72,7 @@ python -m modernized.option_a_pandas.trade_processor \
 Expected summary on the test data:
 
 ```
-ProcessingResult: total_loaded=7, duplicates_removed=1, validation_errors=1, matched=1, breaks=2, unmatched=1
+ProcessingResult: total_loaded=7, duplicates_removed=1, validation_errors=2, matched=1, breaks=2, unmatched=1
 ```
 
 The run writes `processed_trades_20240115.csv` and `trade_errors_20240115.txt`
