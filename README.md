@@ -10,8 +10,8 @@
 
 ### Architecture
 The current system consists of:
-- **Batch Python scripts** running on a single Windows Server 2016 via Task Scheduler
-- **Microsoft SQL Server 2016** for storage (no ORM, raw SQL strings)
+- **Batch Python scripts** running on a single Windows Server 2022 via Task Scheduler
+- **Microsoft SQL Server 2022** for storage (no ORM, raw SQL strings)
 - **Flat file processing** — CSV, fixed-width (.dat), and XML files from various counterparties
 - **Network drive storage** (mapped `C:\MeridianData\`) for all input/output files
 - **Manual Excel-based reporting** — scripts generate text files that ops team manually copies into Excel templates
