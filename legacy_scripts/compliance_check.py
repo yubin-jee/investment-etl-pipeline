@@ -20,11 +20,13 @@ except:
     print("ERROR: xml module not found")
     sys.exit(1)
 
-# paths
-COMPLIANCE_DIR = "C:\\MeridianData\\compliance\\"
-HOLDINGS_DIR = "C:\\MeridianData\\holdings\\"
-CLIENTS_DIR = "C:\\MeridianData\\clients\\"
-OUTPUT_DIR = "C:\\MeridianData\\reports\\"
+import etl_config
+
+# OS-agnostic, configurable paths (see etl_config / batch_config.ini / .env)
+COMPLIANCE_DIR = etl_config.COMPLIANCE_DIR
+HOLDINGS_DIR = etl_config.HOLDINGS_DIR
+CLIENTS_DIR = etl_config.CLIENTS_DIR
+OUTPUT_DIR = etl_config.REPORT_DIR
 
 rules = []
 violations = []
@@ -33,10 +35,7 @@ violations = []
 def load_rules():
     """load compliance rules from XML file"""
     global rules
-    file_path = COMPLIANCE_DIR + "compliance_rules.xml"
-
-    if not os.path.exists(file_path):
-        file_path = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "compliance", "compliance_rules.xml")
+    file_path = str(COMPLIANCE_DIR / "compliance_rules.xml")
 
     print("Loading compliance rules: " + file_path)
 
@@ -65,7 +64,7 @@ def load_positions_and_clients(date_str):
     clients = {}
 
     # load positions
-    pos_file = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "holdings", "portfolio_positions_" + date_str + ".csv")
+    pos_file = str(HOLDINGS_DIR / ("portfolio_positions_" + date_str + ".csv"))
     f = open(pos_file, "r")
     reader = csv.reader(f)
     next(reader)
@@ -86,7 +85,7 @@ def load_positions_and_clients(date_str):
     f.close()
 
     # load clients
-    client_file = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "clients", "client_master.csv")
+    client_file = str(CLIENTS_DIR / "client_master.csv")
     f = open(client_file, "r")
     reader = csv.reader(f)
     next(reader)
@@ -190,7 +189,8 @@ def check_fi_minimum(positions, clients):
 
 def write_compliance_report(date_str):
     """write compliance report"""
-    output_path = os.path.join(os.path.dirname(__file__), "..", "reports", "compliance_report_" + date_str + ".csv")
+    etl_config.ensure_dirs()
+    output_path = str(OUTPUT_DIR / ("compliance_report_" + date_str + ".csv"))
 
     print("\nWriting compliance report to: " + output_path)
 

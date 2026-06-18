@@ -15,9 +15,11 @@ import os
 import sys
 from datetime import datetime
 
-# paths
-HOLDINGS_DIR = "C:\\MeridianData\\holdings\\"
-OUTPUT_DIR = "C:\\MeridianData\\reports\\"
+import etl_config
+
+# OS-agnostic, configurable paths (see etl_config / batch_config.ini / .env)
+HOLDINGS_DIR = etl_config.HOLDINGS_DIR
+OUTPUT_DIR = etl_config.REPORT_DIR
 
 # tolerance for matching (in dollars)
 TOLERANCE = 1.00  # $1 tolerance - Sandra requested this after too many false breaks
@@ -30,10 +32,7 @@ recon_results = []
 def load_internal_positions(date_str):
     """load our internal position file"""
     global internal_positions
-    file_path = HOLDINGS_DIR + "portfolio_positions_" + date_str + ".csv"
-
-    if not os.path.exists(file_path):
-        file_path = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "holdings", "portfolio_positions_" + date_str + ".csv")
+    file_path = str(HOLDINGS_DIR / ("portfolio_positions_" + date_str + ".csv"))
 
     print("Loading internal positions: " + file_path)
 
@@ -68,10 +67,7 @@ def load_custodian_positions(date_str):
     Format is fragile - hardcoded column positions.
     """
     global custodian_positions
-    file_path = HOLDINGS_DIR + "custodian_positions_" + date_str + ".txt"
-
-    if not os.path.exists(file_path):
-        file_path = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "holdings", "custodian_positions_" + date_str + ".txt")
+    file_path = str(HOLDINGS_DIR / ("custodian_positions_" + date_str + ".txt"))
 
     print("Loading custodian positions: " + file_path)
 
@@ -241,10 +237,8 @@ def run_reconciliation():
 
 def write_recon_report(date_str):
     """write reconciliation report"""
-    output_path = OUTPUT_DIR + "recon_report_" + date_str + ".csv"
-
-    if not os.path.exists(OUTPUT_DIR):
-        output_path = os.path.join(os.path.dirname(__file__), "..", "reports", "recon_report_" + date_str + ".csv")
+    etl_config.ensure_dirs()
+    output_path = str(OUTPUT_DIR / ("recon_report_" + date_str + ".csv"))
 
     print("\nWriting recon report to: " + output_path)
 

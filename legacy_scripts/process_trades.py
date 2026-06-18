@@ -12,10 +12,12 @@ import sys
 import time
 from datetime import datetime
 
-# globals
-TRADE_DIR = "C:\\MeridianData\\trades\\"  # mapped network drive
-OUTPUT_DIR = "C:\\MeridianData\\processed\\"
-ERROR_FILE = "C:\\MeridianData\\logs\\trade_errors.txt"
+import etl_config
+
+# OS-agnostic, configurable paths (see etl_config / batch_config.ini / .env)
+TRADE_DIR = etl_config.TRADE_DIR
+OUTPUT_DIR = etl_config.REPORT_DIR
+ERROR_FILE = etl_config.LOG_DIR / "trade_errors.txt"
 VALID_BROKERS = ["GOLDMN", "MRGST", "JPMC", "BARCL", "CITI", "UBS"]
 
 all_trades = []
@@ -265,22 +267,19 @@ if __name__ == "__main__":
     else:
         run_date = datetime.now().strftime("%Y%m%d")
 
-    trade_file = TRADE_DIR + "daily_trades_" + run_date + ".csv"
-    confirm_file = TRADE_DIR + "counterparty_confirms.dat"
-    output_file = OUTPUT_DIR + "processed_trades_" + run_date + ".csv"
+    etl_config.ensure_dirs()
+    trade_file = TRADE_DIR / ("daily_trades_" + run_date + ".csv")
+    confirm_file = TRADE_DIR / "counterparty_confirms.dat"
 
     # check if files exist
-    if not os.path.exists(trade_file):
-        print("ERROR: Trade file not found: " + trade_file)
-        print("Trying fallback path...")
-        trade_file = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "trades", "daily_trades_" + run_date + ".csv")
+    if not trade_file.exists():
+        print("ERROR: Trade file not found: " + str(trade_file))
 
-    if not os.path.exists(confirm_file):
-        print("ERROR: Confirm file not found: " + confirm_file)
-        confirm_file = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "trades", "counterparty_confirms.dat")
+    if not confirm_file.exists():
+        print("ERROR: Confirm file not found: " + str(confirm_file))
 
     # Step 1: Load trades
-    load_trades(trade_file)
+    load_trades(str(trade_file))
 
     # Step 2: Validate
     validate_trades()
@@ -289,15 +288,15 @@ if __name__ == "__main__":
     calc_trade_amounts()
 
     # Step 4: Process counterparty confirms
-    if os.path.exists(confirm_file):
-        confirms = process_counterparty_file(confirm_file)
+    if confirm_file.exists():
+        confirms = process_counterparty_file(str(confirm_file))
         reconcile_with_confirms(confirms)
     else:
         print("WARNING: No counterparty file found, skipping reconciliation")
 
     # Step 5: Write output
-    output_file = os.path.join(os.path.dirname(__file__), "..", "reports", "processed_trades_" + run_date + ".csv")
-    write_output(output_file)
+    output_file = OUTPUT_DIR / ("processed_trades_" + run_date + ".csv")
+    write_output(str(output_file))
 
     # Step 6: Log errors
     # write_error_log()  # commented out - log dir doesn't exist on new server
