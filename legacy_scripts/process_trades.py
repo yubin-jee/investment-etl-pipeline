@@ -8,9 +8,19 @@ NOTE: DO NOT MODIFY - this runs in production cron at 6:30 AM EST daily
 
 import csv
 import os
+import re
 import sys
 import time
 from datetime import datetime
+
+
+def validate_run_date(run_date):
+    """Allow only an 8-digit YYYYMMDD token so it can't be used to
+    traverse the file system when building input/output paths."""
+    if not re.fullmatch(r"\d{8}", run_date):
+        print("ERROR: invalid run date (expected YYYYMMDD): " + str(run_date))
+        sys.exit(1)
+    return run_date
 
 # globals
 TRADE_DIR = "C:\\MeridianData\\trades\\"  # mapped network drive
@@ -264,6 +274,7 @@ if __name__ == "__main__":
         run_date = sys.argv[1]
     else:
         run_date = datetime.now().strftime("%Y%m%d")
+    run_date = validate_run_date(run_date)
 
     trade_file = TRADE_DIR + "daily_trades_" + run_date + ".csv"
     confirm_file = TRADE_DIR + "counterparty_confirms.dat"

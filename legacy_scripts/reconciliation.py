@@ -23,6 +23,15 @@ CUSTODIAN_ROW_RE = re.compile(
     r"(?P<qty>[\d,]+)\s+(?P<price>[\d,.]+)\s+(?P<mktval>[\d,.]+)\s*$"
 )
 
+
+def validate_run_date(run_date):
+    """Allow only an 8-digit YYYYMMDD token so it can't be used to
+    traverse the file system when building input/output paths."""
+    if not re.fullmatch(r"\d{8}", run_date):
+        print("ERROR: invalid run date (expected YYYYMMDD): " + str(run_date))
+        sys.exit(1)
+    return run_date
+
 # paths
 HOLDINGS_DIR = "C:\\MeridianData\\holdings\\"
 OUTPUT_DIR = "C:\\MeridianData\\reports\\"
@@ -286,6 +295,7 @@ if __name__ == "__main__":
         run_date = sys.argv[1]
     else:
         run_date = "20240315"
+    run_date = validate_run_date(run_date)
 
     load_internal_positions(run_date)
     load_custodian_positions(run_date)
