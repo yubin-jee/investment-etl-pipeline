@@ -12,8 +12,25 @@ Last Modified: 2023-02-17
 
 import csv
 import os
+import re
 import sys
 from datetime import datetime
+
+# custodian rows: ACCOUNT  SECURITY NAME  CUSIP(9 alnum or ---)  QTY  PRICE  MKT_VALUE
+# whitespace-tolerant so misaligned source rows still parse correctly
+CUSTODIAN_ROW_RE = re.compile(
+    r"^(?P<acct>\S+)\s+(?P<name>.+?)\s+(?P<cusip>[0-9A-Z]{9}|-+)\s+"
+    r"(?P<qty>[\d,]+)\s+(?P<price>[\d,.]+)\s+(?P<mktval>[\d,.]+)\s*$"
+)
+
+
+def validate_run_date(run_date):
+    """Allow only an 8-digit YYYYMMDD token so it can't be used to
+    traverse the file system when building input/output paths."""
+    if not re.fullmatch(r"\d{8}", run_date):
+        print("ERROR: invalid run date (expected YYYYMMDD): " + str(run_date))
+        sys.exit(1)
+    return run_date
 
 # paths
 HOLDINGS_DIR = "C:\\MeridianData\\holdings\\"
@@ -88,15 +105,17 @@ def load_custodian_positions(date_str):
         if len(line.strip()) < 10:
             continue
 
-        # parse fixed-width columns
-        # ACCOUNT(0-10) SECURITY(11-31) CUSIP(32-45) QTY(46-56) MKT_PRICE(57-69) MKT_VALUE(70-85)
+        # parse columns by structure rather than hardcoded offsets so that
+        # rows with slightly misaligned spacing still parse correctly
+        m = CUSTODIAN_ROW_RE.match(line)
+        if not m:
+            continue
         try:
-            acct = line[0:10].strip()
-            security_name = line[11:31].strip()
-            cusip = line[32:45].strip()
-            qty_str = line[46:56].strip().replace(",", "")
-            price_str = line[57:69].strip().replace(",", "")
-            mkt_val_str = line[70:85].strip().replace(",", "")
+            acct = m.group("acct").strip()
+            security_name = m.group("name").strip()
+            cusip = m.group("cusip").strip()
+            qty_str = m.group("qty").replace(",", "")
+            mkt_val_str = m.group("mktval").replace(",", "")
 
             if not acct or not qty_str:
                 continue
@@ -276,6 +295,7 @@ if __name__ == "__main__":
         run_date = sys.argv[1]
     else:
         run_date = "20240315"
+    run_date = validate_run_date(run_date)
 
     load_internal_positions(run_date)
     load_custodian_positions(run_date)

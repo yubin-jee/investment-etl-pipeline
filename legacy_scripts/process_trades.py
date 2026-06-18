@@ -8,9 +8,19 @@ NOTE: DO NOT MODIFY - this runs in production cron at 6:30 AM EST daily
 
 import csv
 import os
+import re
 import sys
 import time
 from datetime import datetime
+
+
+def validate_run_date(run_date):
+    """Allow only an 8-digit YYYYMMDD token so it can't be used to
+    traverse the file system when building input/output paths."""
+    if not re.fullmatch(r"\d{8}", run_date):
+        print("ERROR: invalid run date (expected YYYYMMDD): " + str(run_date))
+        sys.exit(1)
+    return run_date
 
 # globals
 TRADE_DIR = "C:\\MeridianData\\trades\\"  # mapped network drive
@@ -184,27 +194,27 @@ def process_counterparty_file(filepath):
     for line in f:
         if line.startswith("HDR"):
             # header record - extract broker name
-            current_broker = line[14:36].strip()
+            current_broker = line[11:33].strip()
             print("  Broker: " + current_broker)
         elif line.startswith("TRL"):
             # trailer record - skip
-            count = int(line[3:12])
+            count = int(line[3:11])
             print("  Trailer count: " + str(count))
         elif line.startswith("T-"):
             # trade record
             confirm = {}
-            confirm["trade_id"] = line[0:16].strip()
-            confirm["account"] = line[16:26].strip()
-            confirm["ticker"] = line[26:36].strip()
-            confirm["side"] = line[36:40].strip()
-            confirm["quantity"] = int(line[40:52])
+            confirm["trade_id"] = line[0:14].strip()
+            confirm["account"] = line[14:24].strip()
+            confirm["ticker"] = line[24:34].strip()
+            confirm["side"] = line[34:38].strip()
+            confirm["quantity"] = int(line[38:46])
             # price has implied 2 decimal places
-            raw_price = int(line[52:64])
+            raw_price = int(line[46:56])
             confirm["price"] = raw_price / 100.0
-            confirm["currency"] = line[64:67].strip()
-            date_str = line[67:75]
+            confirm["currency"] = line[56:59].strip()
+            date_str = line[59:67]
             confirm["trade_date"] = date_str[0:2] + "/" + date_str[2:4] + "/" + date_str[4:8]
-            confirm["status"] = line[75:83].strip()
+            confirm["status"] = line[67:].strip()
             confirm["broker"] = current_broker
             confirms.append(confirm)
 
@@ -264,6 +274,7 @@ if __name__ == "__main__":
         run_date = sys.argv[1]
     else:
         run_date = datetime.now().strftime("%Y%m%d")
+    run_date = validate_run_date(run_date)
 
     trade_file = TRADE_DIR + "daily_trades_" + run_date + ".csv"
     confirm_file = TRADE_DIR + "counterparty_confirms.dat"
