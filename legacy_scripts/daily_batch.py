@@ -3,9 +3,8 @@
 Daily Batch Runner - Meridian Capital Partners
 Runs all daily processing scripts in sequence
 
-Scheduled via cron / a container orchestration scheduler (see deploy/crontab
-and docker-compose.yml) rather than Windows Task Scheduler. Schedule times are
-configured in config/batch_config.ini ([schedule], cron expressions).
+Scheduled via cron / a container scheduler (see deploy/crontab and the
+[schedule] cron expressions in config/batch_config.ini), not Task Scheduler.
 
 Author: Mike Torres
 Last Modified: 2022-09-01
