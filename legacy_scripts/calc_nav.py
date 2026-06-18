@@ -19,11 +19,13 @@ import os
 import sys
 from datetime import datetime
 
-# hardcoded paths
-PRICING_DIR = "C:\\MeridianData\\pricing\\"
-HOLDINGS_DIR = "C:\\MeridianData\\holdings\\"
-CLIENTS_DIR = "C:\\MeridianData\\clients\\"
-OUTPUT_DIR = "C:\\MeridianData\\reports\\"
+import etl_config
+
+# OS-agnostic, configurable paths (see etl_config / batch_config.ini / .env)
+PRICING_DIR = etl_config.PRICING_DIR
+HOLDINGS_DIR = etl_config.HOLDINGS_DIR
+CLIENTS_DIR = etl_config.CLIENTS_DIR
+OUTPUT_DIR = etl_config.REPORT_DIR
 
 # fee schedules - hardcoded because the database is too slow
 FEE_SCHEDULES = {
@@ -41,11 +43,7 @@ nav_results = []
 def load_prices(date_str):
     """load market prices for given date"""
     global prices
-    file_path = PRICING_DIR + "market_prices_" + date_str + ".csv"
-
-    # fallback to local
-    if not os.path.exists(file_path):
-        file_path = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "pricing", "market_prices_" + date_str + ".csv")
+    file_path = str(PRICING_DIR / ("market_prices_" + date_str + ".csv"))
 
     print("Loading prices from: " + file_path)
 
@@ -65,10 +63,7 @@ def load_prices(date_str):
 def load_positions(date_str):
     """load portfolio positions"""
     global positions
-    file_path = HOLDINGS_DIR + "portfolio_positions_" + date_str + ".csv"
-
-    if not os.path.exists(file_path):
-        file_path = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "holdings", "portfolio_positions_" + date_str + ".csv")
+    file_path = str(HOLDINGS_DIR / ("portfolio_positions_" + date_str + ".csv"))
 
     print("Loading positions from: " + file_path)
 
@@ -100,10 +95,7 @@ def load_positions(date_str):
 def load_clients():
     """load client master data"""
     global clients
-    file_path = CLIENTS_DIR + "client_master.csv"
-
-    if not os.path.exists(file_path):
-        file_path = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "clients", "client_master.csv")
+    file_path = str(CLIENTS_DIR / "client_master.csv")
 
     print("Loading clients from: " + file_path)
 
@@ -219,10 +211,8 @@ def calculate_nav():
 
 def write_nav_report(date_str):
     """write NAV report to CSV"""
-    output_path = OUTPUT_DIR + "nav_report_" + date_str + ".csv"
-
-    if not os.path.exists(OUTPUT_DIR):
-        output_path = os.path.join(os.path.dirname(__file__), "..", "reports", "nav_report_" + date_str + ".csv")
+    etl_config.ensure_dirs()
+    output_path = str(OUTPUT_DIR / ("nav_report_" + date_str + ".csv"))
 
     print("\nWriting NAV report to: " + output_path)
 

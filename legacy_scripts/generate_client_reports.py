@@ -16,8 +16,10 @@ import os
 import sys
 from datetime import datetime
 
-# paths
-REPORTS_DIR = "C:\\MeridianData\\reports\\"
+import etl_config
+
+# OS-agnostic, configurable paths (see etl_config / batch_config.ini / .env)
+REPORTS_DIR = etl_config.REPORT_DIR
 
 # benchmark returns (hardcoded monthly - updated manually by PM team)
 BENCHMARK_RETURNS = {
@@ -32,7 +34,7 @@ BENCHMARK_RETURNS = {
 
 def load_nav_data(date_str):
     """load NAV report data"""
-    nav_file = os.path.join(os.path.dirname(__file__), "..", "reports", "nav_report_" + date_str + ".csv")
+    nav_file = str(REPORTS_DIR / ("nav_report_" + date_str + ".csv"))
 
     if not os.path.exists(nav_file):
         print("ERROR: NAV report not found: " + nav_file)
@@ -144,7 +146,7 @@ def generate_report(account, date_str):
 
 def write_reports(accounts, date_str):
     """write individual client reports"""
-    output_dir = os.path.join(os.path.dirname(__file__), "..", "reports", "client_reports")
+    output_dir = str(REPORTS_DIR / "client_reports")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 

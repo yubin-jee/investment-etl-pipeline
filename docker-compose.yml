@@ -1,0 +1,44 @@
+# Containerized replacement for the legacy single Windows Server 2016 box.
+# - "etl": the Python ETL application (replaces Windows Task Scheduler batch host)
+# - "sqlserver": SQL Server 2022 (replaces the on-prem SQL Server 2016 instance)
+# - "meridian_data": named volume replacing the mapped C:\MeridianData network drive
+
+services:
+  etl:
+    build: .
+    image: meridian-etl:latest
+    env_file:
+      - .env
+    environment:
+      MERIDIAN_REPORT_DIR: /data/reports
+      MERIDIAN_LOG_DIR: /data/logs
+      MSSQL_HOST: sqlserver
+    volumes:
+      - meridian_data:/data
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    # Run the daily batch; override the date by appending it, e.g.
+    #   docker compose run --rm etl python legacy_scripts/daily_batch.py 20240315
+    command: ["python", "legacy_scripts/daily_batch.py", "20240315"]
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: ${ACCEPT_EULA:-Y}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in .env}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -No -Q \"SELECT 1\" || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\""]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  meridian_data:
+  mssql_data:

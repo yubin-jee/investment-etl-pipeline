@@ -3,8 +3,9 @@
 Daily Batch Runner - Meridian Capital Partners
 Runs all daily processing scripts in sequence
 
-This is called by Windows Task Scheduler at 6:30 AM EST
-If any step fails, Sandra gets an email (configured in Task Scheduler)
+Scheduled via cron / a container orchestration scheduler (see deploy/crontab
+and docker-compose.yml) rather than Windows Task Scheduler. Schedule times are
+configured in config/batch_config.ini ([schedule], cron expressions).
 
 Author: Mike Torres
 Last Modified: 2022-09-01

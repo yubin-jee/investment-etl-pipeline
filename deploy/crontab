@@ -1,0 +1,28 @@
+# Meridian Capital ETL - cron schedule (replaces Windows Task Scheduler).
+#
+# Times are in the host/container timezone. To match the legacy 6:30 AM EST run,
+# set TZ=America/New_York (see .env) or convert these expressions to your TZ.
+#
+# Install on a host:        crontab deploy/crontab
+# Or run as a scheduled container job (Kubernetes CronJob / ECS Scheduled Task /
+# docker compose run on a schedule), invoking daily_batch.py the same way.
+#
+# ┌───────────── minute (0-59)
+# │ ┌───────────── hour (0-23)
+# │ │ ┌───────────── day of month (1-31)
+# │ │ │ ┌───────────── month (1-12)
+# │ │ │ │ ┌───────────── day of week (0-6, Mon-Fri = 1-5)
+# │ │ │ │ │
+# * * * * *  command
+
+TZ=America/New_York
+
+# Full daily batch, weekdays at 06:30 (orchestrates all 5 steps in sequence)
+30 6 * * 1-5  cd /app && python legacy_scripts/daily_batch.py >> /data/logs/daily_batch.log 2>&1
+
+# --- Or schedule individual steps (uncomment to run separately) ---
+# 30 6 * * 1-5  cd /app && python legacy_scripts/process_trades.py          >> /data/logs/process_trades.log 2>&1
+# 45 6 * * 1-5  cd /app && python legacy_scripts/calc_nav.py                >> /data/logs/calc_nav.log 2>&1
+# 0  7 * * 1-5  cd /app && python legacy_scripts/reconciliation.py          >> /data/logs/reconciliation.log 2>&1
+# 15 7 * * 1-5  cd /app && python legacy_scripts/compliance_check.py        >> /data/logs/compliance_check.log 2>&1
+# 0  8 * * 1-5  cd /app && python legacy_scripts/generate_client_reports.py >> /data/logs/client_reports.log 2>&1

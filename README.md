@@ -10,14 +10,14 @@
 
 ### Architecture
 The current system consists of:
-- **Batch Python scripts** running on a single Windows Server 2016 via Task Scheduler
+- **Batch Python scripts** packaged as a Docker container and scheduled via cron / a container orchestrator (replacing the legacy single Windows Server 2016 + Task Scheduler box)
 - **Microsoft SQL Server 2016** for storage (no ORM, raw SQL strings)
 - **Flat file processing** — CSV, fixed-width (.dat), and XML files from various counterparties
-- **Network drive storage** (mapped `C:\MeridianData\`) for all input/output files
+- **Container volume storage** (a named Docker volume, mounted at `/data`) for shared input/output files, replacing the old mapped `C:\MeridianData\` network drive
 - **Manual Excel-based reporting** — scripts generate text files that ops team manually copies into Excel templates
 
 ### Daily Processing Pipeline
-The system runs a sequential batch process every morning at 6:30 AM EST:
+The system runs a sequential batch process every morning at 6:30 AM (scheduled via cron / a container scheduler — see `deploy/crontab` and the `[schedule]` cron expressions in `config/batch_config.ini`):
 
 | Step | Script | Description |
 |------|--------|-------------|
@@ -27,7 +27,7 @@ The system runs a sequential batch process every morning at 6:30 AM EST:
 | 4 | `compliance_check.py` | Checks portfolios against concentration limits and allocation rules |
 | 5 | `generate_client_reports.py` | Generates text-based performance reports for clients |
 
-All scripts are orchestrated by `daily_batch.py` which runs them sequentially via `os.system()`.
+All scripts are orchestrated by `daily_batch.py`, which runs as a scheduled container job (cron / Kubernetes CronJob / ECS Scheduled Task) instead of a Windows Task Scheduler task.
 
 ### Data Sources
 
@@ -47,7 +47,7 @@ All scripts are orchestrated by `daily_batch.py` which runs them sequentially vi
 #### Critical
 - **No error handling** — scripts use bare `except` or no try/catch at all
 - **No logging** — everything uses `print()` statements
-- **Hardcoded Windows paths** — `C:\MeridianData\` paths throughout all scripts
+- ~~**Hardcoded Windows paths** — `C:\MeridianData\` paths throughout all scripts~~ — *resolved: paths are now OS-agnostic (`pathlib`) and driven by env vars / `config/batch_config.ini` (see `legacy_scripts/etl_config.py`)*
 - **No data validation framework** — ad-hoc validation in each script
 - **No tests** — zero unit or integration tests
 - **Date handling is broken** — dates stored as strings (`MM/DD/YYYY`), T+2 settlement calculation ignores weekends/holidays
@@ -64,8 +64,8 @@ All scripts are orchestrated by `daily_batch.py` which runs them sequentially vi
 - **No retry logic** — if a file isn't ready at 6:30 AM, batch fails
 
 #### Medium
-- **No configuration management** — `batch_config.ini` exists but isn't used by scripts
-- **Email notifications broken** — former employee's email still in config
+- ~~**No configuration management** — `batch_config.ini` exists but isn't used by scripts~~ — *resolved: scripts read paths/schedule/config from `batch_config.ini` + env vars (`.env`)*
+- ~~**Email notifications broken** — former employee's email still in config~~ — *resolved: stale `cc_recipients` removed from config*
 - **Reports are text files** — ops team manually copies into Excel templates
 - **No data lineage** — impossible to trace where a number came from
 - **No monitoring/alerting** — failures discovered when clients call
@@ -76,8 +76,14 @@ All scripts are orchestrated by `daily_batch.py` which runs them sequentially vi
 investment-etl-pipeline/
 ├── README.md                           # This file
 ├── requirements.txt                    # Dependencies (currently none - stdlib only)
+├── Dockerfile                          # ETL app image (python:3.12-slim compatible)
+├── docker-compose.yml                  # ETL + SQL Server 2022 + named data volume
+├── .dockerignore                       # Build context excludes
+├── .env.example                        # Env-var configuration template (copy to .env)
+├── deploy/
+│   └── crontab                         # cron schedule (replaces Windows Task Scheduler)
 ├── config/
-│   └── batch_config.ini                # Configuration (mostly unused)
+│   └── batch_config.ini                # Configuration (paths, schedule, db, email, tolerances)
 ├── legacy_data/                        # Sample data files
 │   ├── trades/
 │   │   ├── daily_trades_20240315.csv   # Daily trade file (with intentional data issues)
@@ -99,7 +105,8 @@ investment-etl-pipeline/
 │   ├── calc_nav.py                     # NAV calculation
 │   ├── reconciliation.py               # Position reconciliation vs custodian
 │   ├── compliance_check.py             # Compliance rule checking
-│   └── generate_client_reports.py      # Client performance report generation
+│   ├── generate_client_reports.py      # Client performance report generation
+│   └── etl_config.py                   # OS-agnostic path/config resolution (env + ini)
 ├── sql/
 │   ├── create_tables.sql               # Database schema (no constraints)
 │   └── stored_procedures.sql           # Stored procedures (with known bugs)
@@ -125,6 +132,48 @@ python legacy_scripts/generate_client_reports.py 20240315
 
 Output reports are written to the `reports/` directory.
 
+Paths are now OS-agnostic and configurable (no Windows paths). Override the data,
+report, and log locations via environment variables (or `config/batch_config.ini`):
+
+```bash
+cp .env.example .env            # then edit values
+export MERIDIAN_DATA_DIR=/path/to/data
+export MERIDIAN_REPORT_DIR=/path/to/reports
+python legacy_scripts/daily_batch.py 20240315
+```
+
+## Containerized Deployment
+
+The pipeline runs as containers instead of on a Windows Server 2016 box:
+
+```bash
+# 1. Configure (never commit the real .env)
+cp .env.example .env            # set MSSQL_SA_PASSWORD etc.
+
+# 2. Validate the compose file
+docker compose config
+
+# 3. Build the ETL image
+docker compose build
+
+# 4. Run the daily batch (starts SQL Server 2022, waits for healthcheck)
+docker compose run --rm etl python legacy_scripts/daily_batch.py 20240315
+```
+
+Services defined in `docker-compose.yml`:
+- **etl** — the Python ETL app (built from the `Dockerfile`).
+- **sqlserver** — `mcr.microsoft.com/mssql/server:2022-latest` with a healthcheck and a `mssql_data` named volume.
+- **meridian_data** — named volume mounted at `/data`, replacing the mapped `C:\MeridianData\` network drive.
+
+### Scheduling
+
+Windows Task Scheduler is replaced by cron (or a container orchestration scheduler).
+A ready-to-use schedule lives in `deploy/crontab` (install with `crontab deploy/crontab`),
+and the cron expressions are mirrored in the `[schedule]` section of
+`config/batch_config.ini`. To run as a scheduled container job, invoke
+`daily_batch.py` from a Kubernetes CronJob, an ECS Scheduled Task, or
+`docker compose run` triggered by host cron.
+
 ## Migration Objectives
 
 The goal is to modernize this legacy system into a production-grade ETL pipeline. Key migration requirements:
@@ -143,7 +192,7 @@ The goal is to modernize this legacy system into a production-grade ETL pipeline
 - Add data lineage and audit trails
 
 ### 3. Integration Improvements
-- Replace hardcoded file paths with configurable data connectors
+- ~~Replace hardcoded file paths with configurable data connectors~~ — *done: env/ini-driven `pathlib` paths via `etl_config.py`*
 - Automate CUSIP/SEDOL/ticker resolution via reference data service
 - Replace hardcoded benchmark returns with market data feed
 - Add support for real-time trade processing (not just batch)
@@ -161,10 +210,16 @@ The goal is to modernize this legacy system into a production-grade ETL pipeline
 - Real-time position monitoring
 
 ### 6. Operational Excellence
+- ~~Containerize the application and remove the Windows Server 2016 dependency~~ — *done: Docker + `docker-compose.yml` (ETL + SQL Server 2022 + named data volume); cron / container-scheduled batch replaces Windows Task Scheduler*
 - Add comprehensive test suite (unit + integration)
 - Implement CI/CD pipeline
 - Add monitoring, alerting, and observability
 - Documentation and runbooks
+
+### Target Deployment Requirements
+- **Docker** (Engine 24+) and **Docker Compose v2** for local/dev runs
+- A container scheduler for production (cron, Kubernetes CronJob, or ECS Scheduled Task) — no Windows host required
+- Linux-compatible: no Windows-specific paths, drives, or modules
 
 ## Data Quality Issues in Sample Data
 
