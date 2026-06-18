@@ -18,6 +18,7 @@ KNOWN ISSUES:
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import time
@@ -40,6 +41,8 @@ def run_step(script_name: str, run_date: str) -> int:
 def main(argv: list[str]) -> None:
     # figure out today's date, allow override from command line
     today = argv[1] if len(argv) > 1 else datetime.now().strftime("%Y%m%d")
+    if not re.fullmatch(r"\d{8}", today):
+        raise SystemExit(f"Invalid run date {today!r}: expected YYYYMMDD")
 
     log.info("*" * 60)
     log.info("* MERIDIAN CAPITAL - DAILY BATCH PROCESSING")

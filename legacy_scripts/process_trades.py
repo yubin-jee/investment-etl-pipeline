@@ -10,6 +10,7 @@ reconciles against fixed-width counterparty confirmation files.
 from __future__ import annotations
 
 import csv
+import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -326,6 +327,8 @@ def main(argv: list[str]) -> None:
 
     # get today's date for file name
     run_date = argv[1] if len(argv) > 1 else datetime.now().strftime("%Y%m%d")
+    if not re.fullmatch(r"\d{8}", run_date):
+        raise SystemExit(f"Invalid run date {run_date!r}: expected YYYYMMDD")
 
     trade_file: str | Path = rf"{TRADE_DIR}\daily_trades_{run_date}.csv"
     confirm_file: str | Path = rf"{TRADE_DIR}\counterparty_confirms.dat"

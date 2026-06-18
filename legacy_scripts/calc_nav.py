@@ -15,6 +15,7 @@ WARNING: This script has known rounding issues with large positions.
 from __future__ import annotations
 
 import csv
+import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -330,6 +331,8 @@ def main(argv: list[str]) -> None:
     log.info("=" * 60)
 
     run_date = argv[1] if len(argv) > 1 else "20240315"
+    if not re.fullmatch(r"\d{8}", run_date):
+        raise SystemExit(f"Invalid run date {run_date!r}: expected YYYYMMDD")
 
     # Step 1: Load data
     prices = load_prices(run_date)

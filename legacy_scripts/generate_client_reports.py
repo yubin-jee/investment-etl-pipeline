@@ -12,6 +12,7 @@ NOTE: This generates a text report. The ops team then manually
 from __future__ import annotations
 
 import csv
+import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -187,6 +188,8 @@ def main(argv: list[str]) -> None:
     log.info("=" * 60)
 
     run_date = argv[1] if len(argv) > 1 else "20240315"
+    if not re.fullmatch(r"\d{8}", run_date):
+        raise SystemExit(f"Invalid run date {run_date!r}: expected YYYYMMDD")
 
     # Load NAV data (must run calc_nav.py first)
     accounts = load_nav_data(run_date)
