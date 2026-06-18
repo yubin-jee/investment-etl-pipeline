@@ -10,7 +10,7 @@
 
 ### Architecture
 The current system consists of:
-- **Batch Python scripts** running on a single Windows Server 2016 via Task Scheduler
+- **Batch Python scripts** (modernized for Python 3.12+) running on a single Windows Server 2016 via Task Scheduler
 - **Microsoft SQL Server 2016** for storage (no ORM, raw SQL strings)
 - **Flat file processing** — CSV, fixed-width (.dat), and XML files from various counterparties
 - **Network drive storage** (mapped `C:\MeridianData\`) for all input/output files
@@ -75,7 +75,9 @@ All scripts are orchestrated by `daily_batch.py` which runs them sequentially vi
 ```
 investment-etl-pipeline/
 ├── README.md                           # This file
-├── requirements.txt                    # Dependencies (currently none - stdlib only)
+├── requirements.txt                    # Python 3.12+ dependencies (pandas, SQLAlchemy, etc.)
+├── pyproject.toml                      # Project metadata (requires-python >=3.12)
+├── Dockerfile                          # Container image (python:3.12-slim)
 ├── config/
 │   └── batch_config.ini                # Configuration (mostly unused)
 ├── legacy_data/                        # Sample data files
@@ -108,6 +110,13 @@ investment-etl-pipeline/
 ```
 
 ## Running the Legacy System
+
+**Minimum requirements:** Python 3.12+ (see `pyproject.toml`). Install the
+dependencies first:
+
+```bash
+pip install -r requirements.txt   # or: pip install -e .
+```
 
 The scripts can be run locally for demo purposes using the sample data:
 

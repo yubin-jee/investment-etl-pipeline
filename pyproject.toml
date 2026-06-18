@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "investment-etl-pipeline"
+version = "0.1.0"
+description = "Meridian Capital Partners investment data processing pipeline (modernized for Python 3.12+)."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "Meridian Capital Partners" },
+]
+dependencies = [
+    "pandas>=2.2,<3.0",
+    "sqlalchemy>=2.0,<3.0",
+    "python-dotenv>=1.0,<2.0",
+    "lxml>=5.0,<6.0",
+    "openpyxl>=3.1,<4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.5,<1.0",
+]
+
+[tool.setuptools]
+packages = ["legacy_scripts"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100

@@ -1,261 +1,350 @@
 #!/usr/bin/env python
 """
 Compliance Check Script - Meridian Capital Partners
-Checks portfolio positions against compliance rules
+Checks portfolio positions against compliance rules.
 
 Author: Lisa Park / Dave Ops
 NOTE: Rules are loaded from XML because that's what the old
       compliance vendor used. Nobody knows why it's XML.
-
-Last Modified: 2023-01-09
 """
 
+from __future__ import annotations
+
 import csv
-import os
 import sys
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from datetime import datetime
-try:
-    import xml.etree.ElementTree as ET
-except:
-    print("ERROR: xml module not found")
-    sys.exit(1)
+from pathlib import Path
 
-# paths
-COMPLIANCE_DIR = "C:\\MeridianData\\compliance\\"
-HOLDINGS_DIR = "C:\\MeridianData\\holdings\\"
-CLIENTS_DIR = "C:\\MeridianData\\clients\\"
-OUTPUT_DIR = "C:\\MeridianData\\reports\\"
+from logging_config import get_logger
 
-rules = []
-violations = []
+log = get_logger(__name__)
+
+# Legacy Windows network drive locations (kept for display; the local fallbacks
+# below are used off Windows).
+COMPLIANCE_DIR = r"C:\MeridianData\compliance"
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "legacy_data"
+REPORTS_DIR = BASE_DIR / "reports"
 
 
-def load_rules():
-    """load compliance rules from XML file"""
-    global rules
-    file_path = COMPLIANCE_DIR + "compliance_rules.xml"
+@dataclass
+class Rule:
+    id: str | None
+    severity: str | None
+    name: str | None
+    description: str | None
+    threshold: float | None
+    asset_class: str | None
+    account_types: list[str] | None
+    action: str | None
 
-    if not os.path.exists(file_path):
-        file_path = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "compliance", "compliance_rules.xml")
 
-    print("Loading compliance rules: " + file_path)
+@dataclass
+class Position:
+    ticker: str
+    quantity: int
+    market_value: float
+    asset_class: str
+    sector: str
+
+
+@dataclass
+class ClientInfo:
+    name: str
+    type: str
+
+
+@dataclass
+class Violation:
+    rule_id: str
+    severity: str
+    account: str
+    client: str
+    detail: str
+    value: float
+    action: str
+
+
+def load_rules() -> list[Rule]:
+    """Load compliance rules from XML file."""
+    file_path: str | Path = rf"{COMPLIANCE_DIR}\compliance_rules.xml"
+
+    if not Path(file_path).exists():
+        file_path = DATA_DIR / "compliance" / "compliance_rules.xml"
+
+    log.info(f"Loading compliance rules: {file_path}")
 
     tree = ET.parse(file_path)
     root = tree.getroot()
 
+    rules: list[Rule] = []
     for rule_elem in root.findall("Rule"):
-        rule = {
-            "id": rule_elem.get("id"),
-            "severity": rule_elem.get("severity"),
-            "name": rule_elem.find("Name").text,
-            "description": rule_elem.find("Description").text,
-            "threshold": float(rule_elem.find("Threshold").text) if rule_elem.find("Threshold") is not None else None,
-            "asset_class": rule_elem.find("AssetClass").text if rule_elem.find("AssetClass") is not None else None,
-            "account_types": rule_elem.find("AccountTypes").text.split(",") if rule_elem.find("AccountTypes") is not None else None,
-            "action": rule_elem.find("Action").text,
-        }
-        rules.append(rule)
+        threshold_elem = rule_elem.find("Threshold")
+        asset_class_elem = rule_elem.find("AssetClass")
+        account_types_elem = rule_elem.find("AccountTypes")
+        rules.append(
+            Rule(
+                id=rule_elem.get("id"),
+                severity=rule_elem.get("severity"),
+                name=rule_elem.find("Name").text,
+                description=rule_elem.find("Description").text,
+                threshold=float(threshold_elem.text) if threshold_elem is not None else None,
+                asset_class=asset_class_elem.text if asset_class_elem is not None else None,
+                account_types=(
+                    account_types_elem.text.split(",") if account_types_elem is not None else None
+                ),
+                action=rule_elem.find("Action").text,
+            )
+        )
 
-    print("Loaded " + str(len(rules)) + " rules")
+    log.info(f"Loaded {len(rules)} rules")
+    return rules
 
 
-def load_positions_and_clients(date_str):
-    """load positions and client data for checking"""
-    positions = {}
-    clients = {}
+def load_positions_and_clients(
+    date_str: str,
+) -> tuple[dict[str, list[Position]], dict[str, ClientInfo]]:
+    """Load positions and client data for checking."""
+    positions: dict[str, list[Position]] = {}
+    clients: dict[str, ClientInfo] = {}
 
     # load positions
-    pos_file = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "holdings", "portfolio_positions_" + date_str + ".csv")
-    f = open(pos_file, "r")
-    reader = csv.reader(f)
-    next(reader)
-    for row in reader:
-        acct = row[0]
-        if acct not in positions:
-            positions[acct] = []
-        qty = int(row[4]) if row[4] else 0
-        mkt_val = float(row[6]) if row[6] else 0.0
-        if qty > 0:
-            positions[acct].append({
-                "ticker": row[1],
-                "quantity": qty,
-                "market_value": mkt_val,
-                "asset_class": row[8],
-                "sector": row[9]
-            })
-    f.close()
+    pos_file = DATA_DIR / "holdings" / f"portfolio_positions_{date_str}.csv"
+    with open(pos_file) as f:
+        reader = csv.reader(f)
+        next(reader)
+        for row in reader:
+            acct = row[0]
+            qty = int(row[4]) if row[4] else 0
+            mkt_val = float(row[6]) if row[6] else 0.0
+            if qty > 0:
+                positions.setdefault(acct, []).append(
+                    Position(
+                        ticker=row[1],
+                        quantity=qty,
+                        market_value=mkt_val,
+                        asset_class=row[8],
+                        sector=row[9],
+                    )
+                )
 
     # load clients
-    client_file = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "clients", "client_master.csv")
-    f = open(client_file, "r")
-    reader = csv.reader(f)
-    next(reader)
-    for row in reader:
-        clients[row[0]] = {"name": row[1], "type": row[2]}
-    f.close()
+    client_file = DATA_DIR / "clients" / "client_master.csv"
+    with open(client_file) as f:
+        reader = csv.reader(f)
+        next(reader)
+        for row in reader:
+            clients[row[0]] = ClientInfo(name=row[1], type=row[2])
 
     return positions, clients
 
 
-def check_concentration_limits(positions, clients):
-    """RULE-001: Single security concentration limit (10%)"""
-    global violations
-    print("\nChecking RULE-001: Single Security Concentration...")
+def _client_name(clients: dict[str, ClientInfo], acct: str) -> str:
+    client = clients.get(acct)
+    return client.name if client else "UNKNOWN"
 
+
+def check_concentration_limits(
+    positions: dict[str, list[Position]], clients: dict[str, ClientInfo]
+) -> list[Violation]:
+    """RULE-001: Single security concentration limit (10%)."""
+    log.info("\nChecking RULE-001: Single Security Concentration...")
+
+    violations: list[Violation] = []
     for acct in positions:
-        total_value = sum([p["market_value"] for p in positions[acct]])
+        total_value = sum(p.market_value for p in positions[acct])
         if total_value == 0:
             continue
 
         for pos in positions[acct]:
-            concentration = pos["market_value"] / total_value
+            concentration = pos.market_value / total_value
             if concentration > 0.10:
-                violation = {
-                    "rule_id": "RULE-001",
-                    "severity": "CRITICAL",
-                    "account": acct,
-                    "client": clients.get(acct, {}).get("name", "UNKNOWN"),
-                    "detail": pos["ticker"] + " is " + str(round(concentration * 100, 2)) + "% of portfolio (limit: 10%)",
-                    "value": round(concentration * 100, 2),
-                    "action": "BLOCK_TRADE"
-                }
-                violations.append(violation)
-                print("  VIOLATION: " + acct + " - " + violation["detail"])
+                detail = (
+                    f"{pos.ticker} is {round(concentration * 100, 2)}% of portfolio (limit: 10%)"
+                )
+                violations.append(
+                    Violation(
+                        rule_id="RULE-001",
+                        severity="CRITICAL",
+                        account=acct,
+                        client=_client_name(clients, acct),
+                        detail=detail,
+                        value=round(concentration * 100, 2),
+                        action="BLOCK_TRADE",
+                    )
+                )
+                log.info(f"  VIOLATION: {acct} - {detail}")
+
+    return violations
 
 
-def check_sector_concentration(positions, clients):
-    """RULE-002: Sector concentration limit (30%)"""
-    global violations
-    print("\nChecking RULE-002: Sector Concentration...")
+def check_sector_concentration(
+    positions: dict[str, list[Position]], clients: dict[str, ClientInfo]
+) -> list[Violation]:
+    """RULE-002: Sector concentration limit (30%)."""
+    log.info("\nChecking RULE-002: Sector Concentration...")
 
+    violations: list[Violation] = []
     for acct in positions:
-        total_value = sum([p["market_value"] for p in positions[acct]])
+        total_value = sum(p.market_value for p in positions[acct])
         if total_value == 0:
             continue
 
         # aggregate by sector
-        sector_values = {}
+        sector_values: dict[str, float] = {}
         for pos in positions[acct]:
-            sector = pos["sector"]
-            if sector not in sector_values:
-                sector_values[sector] = 0.0
-            sector_values[sector] = sector_values[sector] + pos["market_value"]
+            sector_values[pos.sector] = sector_values.get(pos.sector, 0.0) + pos.market_value
 
         for sector, value in sector_values.items():
             concentration = value / total_value
             if concentration > 0.30:
-                violation = {
-                    "rule_id": "RULE-002",
-                    "severity": "HIGH",
-                    "account": acct,
-                    "client": clients.get(acct, {}).get("name", "UNKNOWN"),
-                    "detail": sector + " sector is " + str(round(concentration * 100, 2)) + "% of portfolio (limit: 30%)",
-                    "value": round(concentration * 100, 2),
-                    "action": "ALERT"
-                }
-                violations.append(violation)
-                print("  VIOLATION: " + acct + " - " + violation["detail"])
+                detail = (
+                    f"{sector} sector is {round(concentration * 100, 2)}% of portfolio (limit: 30%)"
+                )
+                violations.append(
+                    Violation(
+                        rule_id="RULE-002",
+                        severity="HIGH",
+                        account=acct,
+                        client=_client_name(clients, acct),
+                        detail=detail,
+                        value=round(concentration * 100, 2),
+                        action="ALERT",
+                    )
+                )
+                log.info(f"  VIOLATION: {acct} - {detail}")
+
+    return violations
 
 
-def check_fi_minimum(positions, clients):
-    """RULE-003: Fixed income minimum for retirement/pension accounts"""
-    global violations
-    print("\nChecking RULE-003: Fixed Income Minimum...")
+def check_fi_minimum(
+    positions: dict[str, list[Position]], clients: dict[str, ClientInfo]
+) -> list[Violation]:
+    """RULE-003: Fixed income minimum for retirement/pension accounts."""
+    log.info("\nChecking RULE-003: Fixed Income Minimum...")
 
+    violations: list[Violation] = []
     for acct in positions:
-        client_type = clients.get(acct, {}).get("type", "")
+        client = clients.get(acct)
+        client_type = client.type if client else ""
         if client_type not in ["401K", "PENSION"]:
             continue
 
-        total_value = sum([p["market_value"] for p in positions[acct]])
-        fi_value = sum([p["market_value"] for p in positions[acct] if p["asset_class"] == "FIXED_INCOME"])
+        total_value = sum(p.market_value for p in positions[acct])
+        fi_value = sum(p.market_value for p in positions[acct] if p.asset_class == "FIXED_INCOME")
 
         if total_value == 0:
             continue
 
         fi_pct = fi_value / total_value
         if fi_pct < 0.15:
-            violation = {
-                "rule_id": "RULE-003",
-                "severity": "MEDIUM",
-                "account": acct,
-                "client": clients.get(acct, {}).get("name", "UNKNOWN"),
-                "detail": "Fixed income is " + str(round(fi_pct * 100, 2)) + "% (minimum: 15% for " + client_type + " accounts)",
-                "value": round(fi_pct * 100, 2),
-                "action": "ALERT"
-            }
-            violations.append(violation)
-            print("  VIOLATION: " + acct + " - " + violation["detail"])
+            detail = (
+                f"Fixed income is {round(fi_pct * 100, 2)}% "
+                f"(minimum: 15% for {client_type} accounts)"
+            )
+            violations.append(
+                Violation(
+                    rule_id="RULE-003",
+                    severity="MEDIUM",
+                    account=acct,
+                    client=_client_name(clients, acct),
+                    detail=detail,
+                    value=round(fi_pct * 100, 2),
+                    action="ALERT",
+                )
+            )
+            log.info(f"  VIOLATION: {acct} - {detail}")
+
+    return violations
 
 
-def write_compliance_report(date_str):
-    """write compliance report"""
-    output_path = os.path.join(os.path.dirname(__file__), "..", "reports", "compliance_report_" + date_str + ".csv")
+def write_compliance_report(violations: list[Violation], date_str: str) -> None:
+    """Write compliance report."""
+    output_path = REPORTS_DIR / f"compliance_report_{date_str}.csv"
 
-    print("\nWriting compliance report to: " + output_path)
+    log.info(f"\nWriting compliance report to: {output_path}")
 
-    f = open(output_path, "w", newline="")
-    writer = csv.writer(f)
-    writer.writerow(["RULE_ID", "SEVERITY", "ACCOUNT", "CLIENT", "DETAIL",
-                      "VALUE", "ACTION", "AS_OF_DATE", "GENERATED_AT"])
+    with open(output_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "RULE_ID",
+                "SEVERITY",
+                "ACCOUNT",
+                "CLIENT",
+                "DETAIL",
+                "VALUE",
+                "ACTION",
+                "AS_OF_DATE",
+                "GENERATED_AT",
+            ]
+        )
 
-    for v in violations:
-        writer.writerow([
-            v["rule_id"], v["severity"], v["account"], v["client"],
-            v["detail"], v["value"], v["action"], date_str,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ])
-
-    f.close()
+        for v in violations:
+            writer.writerow(
+                [
+                    v.rule_id,
+                    v.severity,
+                    v.account,
+                    v.client,
+                    v.detail,
+                    v.value,
+                    v.action,
+                    date_str,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                ]
+            )
 
     # print summary
-    critical_count = len([v for v in violations if v["severity"] == "CRITICAL"])
-    high_count = len([v for v in violations if v["severity"] == "HIGH"])
-    medium_count = len([v for v in violations if v["severity"] == "MEDIUM"])
+    critical_count = len([v for v in violations if v.severity == "CRITICAL"])
+    high_count = len([v for v in violations if v.severity == "HIGH"])
+    medium_count = len([v for v in violations if v.severity == "MEDIUM"])
 
-    print("\n" + "=" * 60)
-    print("COMPLIANCE SUMMARY")
-    print("=" * 60)
-    print("  CRITICAL: " + str(critical_count))
-    print("  HIGH:     " + str(high_count))
-    print("  MEDIUM:   " + str(medium_count))
-    print("  TOTAL:    " + str(len(violations)))
+    log.info("\n" + "=" * 60)
+    log.info("COMPLIANCE SUMMARY")
+    log.info("=" * 60)
+    log.info(f"  CRITICAL: {critical_count}")
+    log.info(f"  HIGH:     {high_count}")
+    log.info(f"  MEDIUM:   {medium_count}")
+    log.info(f"  TOTAL:    {len(violations)}")
 
     if critical_count > 0:
-        print("\n  *** CRITICAL VIOLATIONS FOUND - TRADING MAY BE RESTRICTED ***")
+        log.info("\n  *** CRITICAL VIOLATIONS FOUND - TRADING MAY BE RESTRICTED ***")
 
-    print("=" * 60)
+    log.info("=" * 60)
 
 
-# ============================================
-# MAIN
-# ============================================
-if __name__ == "__main__":
-    print("=" * 60)
-    print("MERIDIAN CAPITAL - COMPLIANCE CHECK")
-    print("Run Time: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    print("=" * 60)
+def main(argv: list[str]) -> int:
+    log.info("=" * 60)
+    log.info("MERIDIAN CAPITAL - COMPLIANCE CHECK")
+    log.info("Run Time: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    log.info("=" * 60)
 
-    if len(sys.argv) > 1:
-        run_date = sys.argv[1]
-    else:
-        run_date = "20240315"
+    run_date = argv[1] if len(argv) > 1 else "20240315"
 
     # Load rules and data
     load_rules()
     positions, clients = load_positions_and_clients(run_date)
 
     # Run checks
-    check_concentration_limits(positions, clients)
-    check_sector_concentration(positions, clients)
-    check_fi_minimum(positions, clients)
+    violations: list[Violation] = []
+    violations += check_concentration_limits(positions, clients)
+    violations += check_sector_concentration(positions, clients)
+    violations += check_fi_minimum(positions, clients)
 
     # Write report
-    write_compliance_report(run_date)
+    write_compliance_report(violations, run_date)
 
-    if len(violations) > 0:
-        print("\nCOMPLIANCE CHECK: VIOLATIONS FOUND")
-        sys.exit(1)
-    else:
-        print("\nCOMPLIANCE CHECK: ALL CLEAR")
-        sys.exit(0)
+    if violations:
+        log.info("\nCOMPLIANCE CHECK: VIOLATIONS FOUND")
+        return 1
+
+    log.info("\nCOMPLIANCE CHECK: ALL CLEAR")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

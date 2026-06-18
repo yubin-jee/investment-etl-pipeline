@@ -2,166 +2,233 @@
 """
 Trade Processing Script - Meridian Capital Partners
 Original Author: Mike Torres (left company 2021)
-Last Modified: 2022-08-14
-NOTE: DO NOT MODIFY - this runs in production cron at 6:30 AM EST daily
+
+Loads the daily trade CSV, validates it, computes gross/net amounts and
+reconciles against fixed-width counterparty confirmation files.
 """
 
-import csv
-import os
-import sys
-import time
-from datetime import datetime
+from __future__ import annotations
 
-# globals
-TRADE_DIR = "C:\\MeridianData\\trades\\"  # mapped network drive
-OUTPUT_DIR = "C:\\MeridianData\\processed\\"
-ERROR_FILE = "C:\\MeridianData\\logs\\trade_errors.txt"
+import csv
+import sys
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+from logging_config import get_logger
+
+log = get_logger(__name__)
+
+# Legacy Windows network drive locations (kept for display; never resolve off
+# Windows, so the local fallbacks below are used in practice).
+TRADE_DIR = r"C:\MeridianData\trades"
+OUTPUT_DIR = r"C:\MeridianData\processed"
+ERROR_FILE = r"C:\MeridianData\logs\trade_errors.txt"
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "legacy_data"
+REPORTS_DIR = BASE_DIR / "reports"
+
 VALID_BROKERS = ["GOLDMN", "MRGST", "JPMC", "BARCL", "CITI", "UBS"]
 
-all_trades = []
-error_count = 0
-duplicate_count = 0
-processed_ids = []
+
+@dataclass
+class Trade:
+    trade_id: str
+    account: str
+    ticker: str
+    side: str
+    quantity: int
+    price: float
+    trade_date: str
+    settle_date: str
+    broker: str
+    commission: float
+    status: str
+    gross_amount: float = 0.0
+    net_amount: float = 0.0
+    recon_status: str = ""
 
 
-def load_trades(file_path):
-    """load trades from csv file"""
-    global all_trades, error_count
-    print("Loading trades from " + file_path + "...")
-
-    f = open(file_path, "r")
-    reader = csv.reader(f)
-    header = next(reader)
-
-    for row in reader:
-        try:
-            trade = {}
-            trade["trade_id"] = row[0]
-            trade["account"] = row[1]
-            trade["ticker"] = row[2]
-            trade["side"] = row[3]
-            trade["quantity"] = int(row[4])
-            trade["price"] = float(row[5])
-            trade["trade_date"] = row[6]
-            trade["settle_date"] = row[7]
-            trade["broker"] = row[8]
-            trade["commission"] = float(row[9])
-            trade["status"] = row[10]
-
-            all_trades.append(trade)
-        except Exception as e:
-            print("ERROR processing row: " + str(row))
-            error_count = error_count + 1
-
-    f.close()
-    print("Loaded " + str(len(all_trades)) + " trades")
+@dataclass
+class Confirm:
+    trade_id: str
+    account: str
+    ticker: str
+    side: str
+    quantity: int
+    price: float
+    currency: str
+    trade_date: str
+    status: str
+    broker: str
 
 
-def validate_trades():
-    """basic validation - TODO: add more checks"""
-    global all_trades, error_count, duplicate_count, processed_ids
-    print("Validating trades...")
+def load_trades(file_path: str | Path) -> tuple[list[Trade], int]:
+    """Load trades from a csv file. Returns the trades and the error count."""
+    log.info(f"Loading trades from {file_path}...")
 
-    valid_trades = []
-    for t in all_trades:
+    trades: list[Trade] = []
+    error_count = 0
+
+    with open(file_path) as f:
+        reader = csv.reader(f)
+        next(reader)  # header
+
+        for row in reader:
+            try:
+                trades.append(
+                    Trade(
+                        trade_id=row[0],
+                        account=row[1],
+                        ticker=row[2],
+                        side=row[3],
+                        quantity=int(row[4]),
+                        price=float(row[5]),
+                        trade_date=row[6],
+                        settle_date=row[7],
+                        broker=row[8],
+                        commission=float(row[9]),
+                        status=row[10],
+                    )
+                )
+            except (ValueError, IndexError):
+                log.info(f"ERROR processing row: {row}")
+                error_count += 1
+
+    log.info(f"Loaded {len(trades)} trades")
+    return trades, error_count
+
+
+def validate_trades(trades: list[Trade], error_count: int) -> tuple[list[Trade], int, int]:
+    """Basic validation. Returns valid trades, error count and duplicate count."""
+    log.info("Validating trades...")
+
+    duplicate_count = 0
+    processed_ids: list[str] = []
+    valid_trades: list[Trade] = []
+
+    for t in trades:
         # check for dupes
-        if t["trade_id"] in processed_ids:
-            print("DUPLICATE: " + t["trade_id"])
-            duplicate_count = duplicate_count + 1
+        if t.trade_id in processed_ids:
+            log.info(f"DUPLICATE: {t.trade_id}")
+            duplicate_count += 1
             continue
 
         # check broker
-        if t["broker"] not in VALID_BROKERS:
-            print("INVALID BROKER: " + t["broker"] + " for trade " + t["trade_id"])
-            error_count = error_count + 1
+        if t.broker not in VALID_BROKERS:
+            log.info(f"INVALID BROKER: {t.broker} for trade {t.trade_id}")
+            error_count += 1
             continue
 
         # check quantity
-        if t["quantity"] <= 0:
-            print("INVALID QTY: " + str(t["quantity"]) + " for trade " + t["trade_id"])
-            error_count = error_count + 1
+        if t.quantity <= 0:
+            log.info(f"INVALID QTY: {t.quantity} for trade {t.trade_id}")
+            error_count += 1
             continue
 
         # check price
-        if t["price"] <= 0:
-            print("INVALID PRICE: " + str(t["price"]) + " for trade " + t["trade_id"])
-            error_count = error_count + 1
+        if t.price <= 0:
+            log.info(f"INVALID PRICE: {t.price} for trade {t.trade_id}")
+            error_count += 1
             continue
 
         # check settle date exists
-        if t["settle_date"] == "" or t["settle_date"] is None:
-            print("WARNING: No settle date for " + t["trade_id"] + " - setting to T+2")
+        if t.settle_date == "" or t.settle_date is None:
+            log.info(f"WARNING: No settle date for {t.trade_id} - setting to T+2")
             # manually calculate T+2 - this is wrong for weekends but whatever
-            parts = t["trade_date"].split("/")
+            parts = t.trade_date.split("/")
             month = int(parts[0])
             day = int(parts[1]) + 2
             year = int(parts[2])
             if day > 30:  # rough month end handling
                 day = day - 30
                 month = month + 1
-            t["settle_date"] = str(month).zfill(2) + "/" + str(day).zfill(2) + "/" + str(year)
+            t.settle_date = f"{month:02d}/{day:02d}/{year}"
 
-        processed_ids.append(t["trade_id"])
+        processed_ids.append(t.trade_id)
         valid_trades.append(t)
 
-    all_trades = valid_trades
-    print("Valid trades: " + str(len(valid_trades)))
-    print("Errors: " + str(error_count))
-    print("Duplicates: " + str(duplicate_count))
+    log.info(f"Valid trades: {len(valid_trades)}")
+    log.info(f"Errors: {error_count}")
+    log.info(f"Duplicates: {duplicate_count}")
+    return valid_trades, error_count, duplicate_count
 
 
-def calc_trade_amounts():
-    """calculate gross/net amounts for each trade"""
-    global all_trades
-    print("Calculating trade amounts...")
+def calc_trade_amounts(trades: list[Trade]) -> None:
+    """Calculate gross/net amounts for each trade."""
+    log.info("Calculating trade amounts...")
 
-    for t in all_trades:
-        t["gross_amount"] = t["quantity"] * t["price"]
-        t["net_amount"] = t["gross_amount"] + t["commission"]
-        if t["side"] == "SELL":
-            t["net_amount"] = t["gross_amount"] - t["commission"]
+    for t in trades:
+        t.gross_amount = t.quantity * t.price
+        t.net_amount = t.gross_amount + t.commission
+        if t.side == "SELL":
+            t.net_amount = t.gross_amount - t.commission
 
         # rounding - Mike said to round to 2 decimals
-        t["gross_amount"] = round(t["gross_amount"], 2)
-        t["net_amount"] = round(t["net_amount"], 2)
+        t.gross_amount = round(t.gross_amount, 2)
+        t.net_amount = round(t.net_amount, 2)
 
 
-def write_output(output_path):
-    """write processed trades to output csv"""
-    global all_trades
-    print("Writing output to " + output_path + "...")
+def write_output(trades: list[Trade], output_path: str | Path) -> None:
+    """Write processed trades to output csv."""
+    log.info(f"Writing output to {output_path}...")
 
-    f = open(output_path, "w", newline="")
-    writer = csv.writer(f)
-    writer.writerow(["TRADE_ID", "ACCT_NUM", "TICKER", "SIDE", "QTY", "PRICE",
-                      "GROSS_AMT", "NET_AMT", "COMMISSION", "TRADE_DATE",
-                      "SETTLE_DATE", "BROKER", "STATUS", "PROCESSED_AT"])
+    with open(output_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "TRADE_ID",
+                "ACCT_NUM",
+                "TICKER",
+                "SIDE",
+                "QTY",
+                "PRICE",
+                "GROSS_AMT",
+                "NET_AMT",
+                "COMMISSION",
+                "TRADE_DATE",
+                "SETTLE_DATE",
+                "BROKER",
+                "STATUS",
+                "PROCESSED_AT",
+            ]
+        )
 
-    for t in all_trades:
-        writer.writerow([
-            t["trade_id"], t["account"], t["ticker"], t["side"],
-            t["quantity"], t["price"], t["gross_amount"], t["net_amount"],
-            t["commission"], t["trade_date"], t["settle_date"], t["broker"],
-            t["status"], datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ])
+        for t in trades:
+            writer.writerow(
+                [
+                    t.trade_id,
+                    t.account,
+                    t.ticker,
+                    t.side,
+                    t.quantity,
+                    t.price,
+                    t.gross_amount,
+                    t.net_amount,
+                    t.commission,
+                    t.trade_date,
+                    t.settle_date,
+                    t.broker,
+                    t.status,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                ]
+            )
 
-    f.close()
-    print("Wrote " + str(len(all_trades)) + " trades to output")
+    log.info(f"Wrote {len(trades)} trades to output")
 
 
-def write_error_log():
-    """append errors to log file"""
-    global error_count, duplicate_count
-    f = open(ERROR_FILE, "a")
-    f.write("\n" + "=" * 50 + "\n")
-    f.write("Trade Processing Run: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
-    f.write("Errors: " + str(error_count) + "\n")
-    f.write("Duplicates: " + str(duplicate_count) + "\n")
-    f.write("Total Processed: " + str(len(all_trades)) + "\n")
-    f.close()
+def write_error_log(trades: list[Trade], error_count: int, duplicate_count: int) -> None:
+    """Append errors to log file."""
+    with open(ERROR_FILE, "a") as f:
+        f.write("\n" + "=" * 50 + "\n")
+        f.write("Trade Processing Run: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
+        f.write(f"Errors: {error_count}\n")
+        f.write(f"Duplicates: {duplicate_count}\n")
+        f.write(f"Total Processed: {len(trades)}\n")
 
 
-def process_counterparty_file(filepath):
+def process_counterparty_file(filepath: str | Path) -> list[Confirm]:
     """Parse fixed-width counterparty confirmation files
     Format: see spec doc (lost, ask Dave in ops)
     Field positions from memory:
@@ -175,136 +242,134 @@ def process_counterparty_file(filepath):
       Date:     67-75 (MMDDYYYY)
       Status:   75-83
     """
-    print("Processing counterparty file: " + filepath)
-    confirms = []
-
-    f = open(filepath, "r")
+    log.info(f"Processing counterparty file: {filepath}")
+    confirms: list[Confirm] = []
     current_broker = ""
 
-    for line in f:
-        if line.startswith("HDR"):
-            # header record - extract broker name
-            current_broker = line[14:36].strip()
-            print("  Broker: " + current_broker)
-        elif line.startswith("TRL"):
-            # trailer record - skip
-            count = int(line[3:12])
-            print("  Trailer count: " + str(count))
-        elif line.startswith("T-"):
-            # trade record
-            confirm = {}
-            confirm["trade_id"] = line[0:16].strip()
-            confirm["account"] = line[16:26].strip()
-            confirm["ticker"] = line[26:36].strip()
-            confirm["side"] = line[36:40].strip()
-            confirm["quantity"] = int(line[40:52])
-            # price has implied 2 decimal places
-            raw_price = int(line[52:64])
-            confirm["price"] = raw_price / 100.0
-            confirm["currency"] = line[64:67].strip()
-            date_str = line[67:75]
-            confirm["trade_date"] = date_str[0:2] + "/" + date_str[2:4] + "/" + date_str[4:8]
-            confirm["status"] = line[75:83].strip()
-            confirm["broker"] = current_broker
-            confirms.append(confirm)
+    with open(filepath) as f:
+        for line in f:
+            if line.startswith("HDR"):
+                # header record - extract broker name
+                current_broker = line[14:36].strip()
+                log.info(f"  Broker: {current_broker}")
+            elif line.startswith("TRL"):
+                # trailer record - skip
+                count = int(line[3:12])
+                log.info(f"  Trailer count: {count}")
+            elif line.startswith("T-"):
+                # trade record
+                date_str = line[67:75]
+                # price has implied 2 decimal places
+                raw_price = int(line[52:64])
+                confirms.append(
+                    Confirm(
+                        trade_id=line[0:16].strip(),
+                        account=line[16:26].strip(),
+                        ticker=line[26:36].strip(),
+                        side=line[36:40].strip(),
+                        quantity=int(line[40:52]),
+                        price=raw_price / 100.0,
+                        currency=line[64:67].strip(),
+                        trade_date=f"{date_str[0:2]}/{date_str[2:4]}/{date_str[4:8]}",
+                        status=line[75:83].strip(),
+                        broker=current_broker,
+                    )
+                )
 
-    f.close()
-    print("  Parsed " + str(len(confirms)) + " confirms")
+    log.info(f"  Parsed {len(confirms)} confirms")
     return confirms
 
 
-def reconcile_with_confirms(confirms):
-    """match internal trades with counterparty confirms"""
-    global all_trades
-    print("\nReconciling with counterparty confirms...")
+def reconcile_with_confirms(trades: list[Trade], confirms: list[Confirm]) -> None:
+    """Match internal trades with counterparty confirms."""
+    log.info("\nReconciling with counterparty confirms...")
     matched = 0
     breaks = 0
 
-    for trade in all_trades:
+    for trade in trades:
         found = False
         for confirm in confirms:
-            if trade["trade_id"] == confirm["trade_id"]:
+            if trade.trade_id == confirm.trade_id:
                 found = True
                 # check price matches
-                if abs(trade["price"] - confirm["price"]) > 0.01:
-                    print("PRICE BREAK: " + trade["trade_id"] +
-                          " Internal=" + str(trade["price"]) +
-                          " Confirm=" + str(confirm["price"]))
-                    breaks = breaks + 1
-                    trade["recon_status"] = "PRICE_BREAK"
+                if abs(trade.price - confirm.price) > 0.01:
+                    log.info(
+                        f"PRICE BREAK: {trade.trade_id} "
+                        f"Internal={trade.price} Confirm={confirm.price}"
+                    )
+                    breaks += 1
+                    trade.recon_status = "PRICE_BREAK"
                 # check quantity matches
-                elif trade["quantity"] != confirm["quantity"]:
-                    print("QTY BREAK: " + trade["trade_id"] +
-                          " Internal=" + str(trade["quantity"]) +
-                          " Confirm=" + str(confirm["quantity"]))
-                    breaks = breaks + 1
-                    trade["recon_status"] = "QTY_BREAK"
+                elif trade.quantity != confirm.quantity:
+                    log.info(
+                        f"QTY BREAK: {trade.trade_id} "
+                        f"Internal={trade.quantity} Confirm={confirm.quantity}"
+                    )
+                    breaks += 1
+                    trade.recon_status = "QTY_BREAK"
                 else:
-                    matched = matched + 1
-                    trade["recon_status"] = "MATCHED"
+                    matched += 1
+                    trade.recon_status = "MATCHED"
                 break
         if not found:
-            trade["recon_status"] = "UNMATCHED"
+            trade.recon_status = "UNMATCHED"
 
-    print("Matched: " + str(matched))
-    print("Breaks: " + str(breaks))
+    log.info(f"Matched: {matched}")
+    log.info(f"Breaks: {breaks}")
 
 
-# ============================================
-# MAIN - daily trade processing
-# ============================================
-if __name__ == "__main__":
-    print("=" * 50)
-    print("MERIDIAN CAPITAL - DAILY TRADE PROCESSING")
-    print("Run Time: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    print("=" * 50)
+def main(argv: list[str]) -> None:
+    log.info("=" * 50)
+    log.info("MERIDIAN CAPITAL - DAILY TRADE PROCESSING")
+    log.info("Run Time: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    log.info("=" * 50)
 
     # get today's date for file name
-    if len(sys.argv) > 1:
-        run_date = sys.argv[1]
-    else:
-        run_date = datetime.now().strftime("%Y%m%d")
+    run_date = argv[1] if len(argv) > 1 else datetime.now().strftime("%Y%m%d")
 
-    trade_file = TRADE_DIR + "daily_trades_" + run_date + ".csv"
-    confirm_file = TRADE_DIR + "counterparty_confirms.dat"
-    output_file = OUTPUT_DIR + "processed_trades_" + run_date + ".csv"
+    trade_file: str | Path = rf"{TRADE_DIR}\daily_trades_{run_date}.csv"
+    confirm_file: str | Path = rf"{TRADE_DIR}\counterparty_confirms.dat"
 
     # check if files exist
-    if not os.path.exists(trade_file):
-        print("ERROR: Trade file not found: " + trade_file)
-        print("Trying fallback path...")
-        trade_file = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "trades", "daily_trades_" + run_date + ".csv")
+    if not Path(trade_file).exists():
+        log.info(f"ERROR: Trade file not found: {trade_file}")
+        log.info("Trying fallback path...")
+        trade_file = DATA_DIR / "trades" / f"daily_trades_{run_date}.csv"
 
-    if not os.path.exists(confirm_file):
-        print("ERROR: Confirm file not found: " + confirm_file)
-        confirm_file = os.path.join(os.path.dirname(__file__), "..", "legacy_data", "trades", "counterparty_confirms.dat")
+    if not Path(confirm_file).exists():
+        log.info(f"ERROR: Confirm file not found: {confirm_file}")
+        confirm_file = DATA_DIR / "trades" / "counterparty_confirms.dat"
 
     # Step 1: Load trades
-    load_trades(trade_file)
+    trades, error_count = load_trades(trade_file)
 
     # Step 2: Validate
-    validate_trades()
+    trades, error_count, duplicate_count = validate_trades(trades, error_count)
 
     # Step 3: Calculate amounts
-    calc_trade_amounts()
+    calc_trade_amounts(trades)
 
     # Step 4: Process counterparty confirms
-    if os.path.exists(confirm_file):
+    if Path(confirm_file).exists():
         confirms = process_counterparty_file(confirm_file)
-        reconcile_with_confirms(confirms)
+        reconcile_with_confirms(trades, confirms)
     else:
-        print("WARNING: No counterparty file found, skipping reconciliation")
+        log.info("WARNING: No counterparty file found, skipping reconciliation")
 
     # Step 5: Write output
-    output_file = os.path.join(os.path.dirname(__file__), "..", "reports", "processed_trades_" + run_date + ".csv")
-    write_output(output_file)
+    output_file = REPORTS_DIR / f"processed_trades_{run_date}.csv"
+    write_output(trades, output_file)
 
     # Step 6: Log errors
-    # write_error_log()  # commented out - log dir doesn't exist on new server
+    # write_error_log(...)  # commented out - log dir doesn't exist on new server
 
-    print("\n" + "=" * 50)
-    print("PROCESSING COMPLETE")
-    print("Total Processed: " + str(len(all_trades)))
-    print("Errors: " + str(error_count))
-    print("Duplicates: " + str(duplicate_count))
-    print("=" * 50)
+    log.info("\n" + "=" * 50)
+    log.info("PROCESSING COMPLETE")
+    log.info(f"Total Processed: {len(trades)}")
+    log.info(f"Errors: {error_count}")
+    log.info(f"Duplicates: {duplicate_count}")
+    log.info("=" * 50)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
