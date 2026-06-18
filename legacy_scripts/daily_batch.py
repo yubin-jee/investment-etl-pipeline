@@ -3,8 +3,8 @@
 Daily Batch Runner - Meridian Capital Partners
 Runs all daily processing scripts in sequence
 
-Scheduled via cron / a container scheduler (see deploy/crontab and the
-[schedule] cron expressions in config/batch_config.ini), not Task Scheduler.
+This is called by Windows Task Scheduler at 6:30 AM EST
+If any step fails, Sandra gets an email (configured in Task Scheduler)
 
 Author: Mike Torres
 Last Modified: 2022-09-01

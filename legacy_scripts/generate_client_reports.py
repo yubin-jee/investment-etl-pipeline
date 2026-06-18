@@ -13,6 +13,7 @@ Last Modified: 2022-04-22
 
 import csv
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -150,15 +151,21 @@ def write_reports(accounts, date_str):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    base_dir = os.path.realpath(output_dir)
     for account in accounts:
         report_text = generate_report(account, date_str)
 
-        filename = "report_" + account["account"] + "_" + date_str + ".txt"
-        filepath = os.path.join(output_dir, filename)
+        # Sanitize identifiers (sourced from CLI args / input files) so the
+        # constructed path cannot escape the report directory.
+        safe_account = re.sub(r"[^A-Za-z0-9_-]", "_", account["account"])
+        safe_date = re.sub(r"[^0-9]", "", date_str)
+        filename = "report_" + safe_account + "_" + safe_date + ".txt"
+        filepath = os.path.realpath(os.path.join(base_dir, filename))
+        if os.path.dirname(filepath) != base_dir:
+            raise ValueError("Unsafe report path: " + filepath)
 
-        f = open(filepath, "w")
-        f.write(report_text)
-        f.close()
+        with open(filepath, "w") as f:
+            f.write(report_text)
 
         print("  Generated: " + filename)
 
