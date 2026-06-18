@@ -1,6 +1,6 @@
 -- ============================================================
 -- Meridian Capital Partners - Legacy Database Schema
--- Database: MeridianOMS (SQL Server 2016)
+-- Database: MeridianOMS (SQL Server 2022)
 -- 
 -- Original Author: External consultant (2017)
 -- NOTE: No foreign keys were ever added because "it slowed
