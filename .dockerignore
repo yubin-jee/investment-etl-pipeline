@@ -1,0 +1,15 @@
+.git
+.gitignore
+**/__pycache__
+*.py[cod]
+*.egg-info
+.venv
+venv
+env
+reports/*.csv
+reports/client_reports
+logs
+.env
+.env.local
+*.bak
+*.tmp
