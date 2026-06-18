@@ -124,7 +124,7 @@ def load_custodian_positions(date_str: str) -> dict[str, Position]:
 
     for line in lines:
         # skip headers, footers, separator lines
-        if line.startswith("=") or line.startswith(" ") or line.startswith("-"):
+        if line.startswith(("=", " ", "-")):
             continue
         if any(token in line for token in ("ACCOUNT", "TOTAL", "GENERATED", "CLIENT", "AS OF")):
             continue

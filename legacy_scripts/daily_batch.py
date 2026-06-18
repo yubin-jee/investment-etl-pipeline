@@ -95,7 +95,7 @@ def main(argv: list[str]) -> None:
     log.info("\n\n>>> STEP 5: CLIENT REPORTS <<<")
     log.info("-" * 40)
     start = time.time()
-    ret = run_step("generate_client_reports.py", today)
+    run_step("generate_client_reports.py", today)
     log.info(f"Report generation took {time.time() - start:.1f} seconds")
 
     # Done
